@@ -2,11 +2,19 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-11 (Phase 2, step 1 rework, Tyler's feedback)
+- **Top-down arena** instead of side lanes: enemies pour in from every screen edge and drift freely toward the seed. Sprites will still be drawn in side profile (Phase 5).
+- **Roaming helpers:** Ant, Bee, Firefly, Bombardier, Stag Beetle and Mantis chase enemies inside the defended circle and walk home when it's clear. Melee helpers pin the enemy they fight. Orb-Weaver and Trapdoor Spider stay on their slot (stationary defenders).
+- **Every run starts with one free pack containing one helper.** More packs are bought with Nectar in the shop and opened mid-run (game pauses during the reveal). 1 card per pack for now (`cardsPerPack` in tuning.json).
+- **Helpers are per-run only:** they're gone when the run ends. Duplicates in a run merge into stars (2 copies = 2 stars, 4 = 3 stars). Board full = replace a helper or discard.
+- **Bot balance (6 runs):** 2 of 6 bot runs win all 5 waves; the rest fall on waves 4 to 5. Pack price grows x1.25 per pack.
+- Helpers can't be hurt yet. If roaming feels too safe, enemies attacking helpers is the next lever.
+
 ## 2026-11-11 (Phase 2, step 1: first battle)
 - **Workflow:** each step is a branch + pull request. Tyler tests a preview link, then merges. Merging to main publishes to GitHub Pages.
 - **Data-driven from day one:** heroes, enemies, waves and tuning live in `src/data/*.json` (pulled forward from Phase 4 because it costs nothing now).
-- **Greybox test mode:** clicking a hero slot cycles through all 8 heroes, so combos can be tested before packs exist. Packs replace this in step 2.
-- **Layout:** 1280x720 landscape, scaled to fit any screen. Seed in the middle, 3 hero slots per side, ground enemies from both sides, flyers from the top.
+- **Greybox test mode:** add `?test` to the URL to cycle helpers by clicking slots.
+- **Layout:** 1280x720 landscape, scaled to fit any screen. (Lanes replaced by top-down arena, see above.)
 - **Bot playtest result (5 waves):** 3 starter heroes lose on wave 5 even with the Stinger; 6 heroes win comfortably. That's the intended pressure to buy packs.
 
 ## 2026-11-11 (Tyler's review of the design doc)

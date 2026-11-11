@@ -14,7 +14,7 @@ Tech: TypeScript + Phaser, built with Vite.
 2. In a terminal inside this folder: `npm install` (first time only), then `npm run dev`.
 3. Open the link it prints (usually http://localhost:5173).
 
-Useful extras: add `?speed=3` to the address to run the game 3x faster while testing.
+Useful extras: add `?speed=3` to the address to run the game 3x faster, or `?test` to swap helpers by clicking their slots.
 
 ## Where things live
 

@@ -16,6 +16,9 @@ export interface HeroDef {
   attacksPerSec: number;
   range: number;
   hitsAir: boolean;
+  /** Free-moving helper that chases enemies (false = stays on its slot). */
+  moves?: boolean;
+  moveSpeed?: number;
   splash?: number;
   webSec?: number;
   burnSec?: number;
@@ -40,7 +43,7 @@ export interface WaveGroup {
   enemy: string;
   count: number;
   every: number;
-  side: 'left' | 'right' | 'both' | 'air';
+  side: 'edge' | 'air';
   delay?: number;
 }
 
