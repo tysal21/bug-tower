@@ -1,0 +1,10 @@
+{
+  "note": "Each wave lists groups. side: left | right | both | air. every = seconds between spawns.",
+  "waves": [
+    { "groups": [ { "enemy": "grub", "count": 10, "every": 1.2, "side": "both" } ] },
+    { "groups": [ { "enemy": "grub", "count": 14, "every": 0.9, "side": "both" }, { "enemy": "wasp", "count": 4, "every": 3, "side": "air", "delay": 5 } ] },
+    { "groups": [ { "enemy": "grub", "count": 16, "every": 0.8, "side": "both" }, { "enemy": "snail", "count": 4, "every": 4, "side": "both", "delay": 3 } ] },
+    { "groups": [ { "enemy": "grub", "count": 18, "every": 0.7, "side": "both" }, { "enemy": "wisp", "count": 5, "every": 3, "side": "both", "delay": 4 } ] },
+    { "groups": [ { "enemy": "grub", "count": 24, "every": 0.5, "side": "both" }, { "enemy": "wasp", "count": 8, "every": 2, "side": "air", "delay": 2 }, { "enemy": "snail", "count": 5, "every": 3, "side": "both", "delay": 6 }, { "enemy": "wisp", "count": 5, "every": 3, "side": "both", "delay": 8 } ] }
+  ]
+}

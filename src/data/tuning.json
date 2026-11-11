@@ -1,0 +1,12 @@
+{
+  "seedHp": 1000,
+  "heroSlots": 6,
+  "stinger": { "damage": 5, "attacksPerSec": 4, "webbedBonus": 0.5, "hitRadius": 40 },
+  "swarmSpeedPerAlly": 0.08,
+  "feastBonus": 0.25,
+  "webSlow": 0.4,
+  "wildfire": { "burst": 25, "radius": 90, "burnSec": 3, "burnDps": 5 },
+  "sunderArmorCut": 0.5,
+  "secondsBetweenWaves": 4,
+  "startingHeroes": ["ant", "orbweaver", "firefly"]
+}

@@ -2,6 +2,13 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-11 (Phase 2, step 1: first battle)
+- **Workflow:** each step is a branch + pull request. Tyler tests a preview link, then merges. Merging to main publishes to GitHub Pages.
+- **Data-driven from day one:** heroes, enemies, waves and tuning live in `src/data/*.json` (pulled forward from Phase 4 because it costs nothing now).
+- **Greybox test mode:** clicking a hero slot cycles through all 8 heroes, so combos can be tested before packs exist. Packs replace this in step 2.
+- **Layout:** 1280x720 landscape, scaled to fit any screen. Seed in the middle, 3 hero slots per side, ground enemies from both sides, flyers from the top.
+- **Bot playtest result (5 waves):** 3 starter heroes lose on wave 5 even with the Stinger; 6 heroes win comfortably. That's the intended pressure to buy packs.
+
 ## 2026-11-11 (Tyler's review of the design doc)
 - Confirmed: "Heartseed" as working title; stars last one run only; packs bought in an in-run shop and opened during the run.
 - Added (Tyler's idea): quest nodes in the Mastery tree, unlocked by doing things (e.g. "pull 5 Ants", "trigger Wildfire 50 times"). Greybox gets ~5 quests; counters saved between runs.
