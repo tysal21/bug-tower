@@ -1,5 +1,5 @@
 {
-  "note": "Shop items between runs. packType picks the odds below. requires = skill tree node that unlocks it. weight = how often it shows up in a shop slot.",
+  "note": "Shop items between runs. packType picks the odds below. requires = skill tree node that unlocks it. weight = how often it shows up in a shop slot. variants: base chance a card is Foil/Holo and the damage bonus each gives. brood: minutes for a comb to hatch a free pack.",
   "offerSlots": 3,
   "rerollCost": 1,
   "items": {
@@ -10,5 +10,10 @@
   "packTypes": {
     "meadow": { "odds": { "common": 70, "rare": 24, "epic": 5,  "legendary": 1 } },
     "grove":  { "odds": { "common": 35, "rare": 45, "epic": 16, "legendary": 4 } }
-  }
+  },
+  "variants": {
+    "foil": { "chance": 0.05, "damage": 0.2 },
+    "holo": { "chance": 0.01, "damage": 0.45 }
+  },
+  "brood": { "hatchMinutes": 4 }
 }

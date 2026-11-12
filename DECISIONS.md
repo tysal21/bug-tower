@@ -2,6 +2,15 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-12 (Between-runs screen redesign, from Tyler's layout reference)
+- Two-panel screen: Market on the left (gold + Mastery top-right, priced pack slots, reroll, brood combs, team), skill tree on the right with Upgrades / Collection tabs and a big Battle button bottom-right.
+- Skill tree is a honeycomb graph growing out of the Heartseed: six branches (Economy, Brood, Fortune, Helpers, Legends, Hive). Each cell shows level x/y, a lock until its parent has a level, and glows when affordable.
+- New Brood branch: combs hatch a free pack every 4 minutes of real time (even while away). Upgrades: faster hatch, more combs, twin eggs, Royal Jelly (Grove packs).
+- New Fortune branch: Lucky Rip, Sweet Nectar (rarer pulls), Golden Hour (legendaries), Gilded Wings (Foil), Prismatic Shell (Holo).
+- Foil (+20% damage) and Holo (+45%) variants now roll on every card. Base 5% / 1%.
+- Collection tab: every hero (unknown ones as "?") with the variants you own, plus your current pull odds.
+- Harvest moved from Hive to Economy. Common Folk now needs Kinship first.
+
 ## 2026-11-12 (Skill tree v2, from Tyler's two meta-progression guides)
 - **Targeted over generic:** new **Helpers** branch upgrades the roster: Kinship (all helpers attack speed), Common Folk (common helpers damage), Web / Ember / Swarm Lore (one per combo tag), Keen Mandibles (crits), Ricochet (ranged shots bounce), Marked Prey (bosses take more damage).
 - **Grows with the collection:** **Legends** branch has one node per hero (+20% damage per rank), and a hero's node only appears once you've pulled it. Flagged in-game as a specialist pick, because of the randomness trap: early Mastery is safer in versatile nodes.

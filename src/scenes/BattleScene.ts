@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { ENEMIES, HEROES, HERO_IDS, TUNING, DamageType, TAG_COLOR } from '../game/data';
 import { Enemy } from '../game/Enemy';
 import { Hero } from '../game/Hero';
-import { MetaStats } from '../meta/meta';
+import { MetaStats, variantDamage } from '../meta/meta';
+import type { Variant } from '../meta/save';
 
 export const W = 1280;
 export const H = 720;
@@ -14,7 +15,7 @@ function homeFor(i: number) {
   return { x: SEED.x + Math.cos(a) * r, y: SEED.y + Math.sin(a) * r };
 }
 
-export interface TeamMember { id: string; copies: number; stars: number }
+export interface TeamMember { id: string; copies: number; stars: number; variant?: Variant }
 export interface RunResult { won: boolean; seconds: number; kills: number }
 export interface RunSetup { team: TeamMember[]; meta: MetaStats; onEnd?: (r: RunResult) => void }
 
@@ -107,7 +108,7 @@ export class BattleScene extends Phaser.Scene {
       if (i >= TUNING.maxHelpers) return;
       this.placeInSlot(i, m.id);
       const h = this.heroes[i]!;
-      h.copies = m.copies; h.stars = m.stars; h.refresh();
+      h.copies = m.copies; h.stars = m.stars; h.variant = m.variant ?? 'standard'; h.refresh();
     });
     this.drawHud();
     this.showBanner(this.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!');
@@ -238,7 +239,7 @@ export class BattleScene extends Phaser.Scene {
   applyHit(h: Hero, e: Enemy, mult = 1) {
     if (!e.alive) return;
     const d = h.def;
-    let dmg = mult * h.damage * (1 + (d.rarity === 'common' ? this.meta.commonDmg : 0) + (this.meta.heroDmg[h.id] ?? 0));
+    let dmg = mult * h.damage * (1 + (d.rarity === 'common' ? this.meta.commonDmg : 0) + (this.meta.heroDmg[h.id] ?? 0) + variantDamage(h.variant));
     if (Math.random() < this.meta.critChance) { dmg *= 2; this.floatText(e.x, e.y - 32, 'CRIT', '#ffd76e'); }
     if (d.tag === 'swarm' && e.webbed) dmg *= 1 + TUNING.feastBonus; // Feast
     if (d.damageType === 'fire' && e.webbed) this.wildfire(e); // Wildfire

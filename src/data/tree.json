@@ -1,300 +1,54 @@
 {
-  "note": "Mastery tree. cost[i] = Mastery for rank i+1. effect = what each rank adds. requires = node needed first. Legends nodes (one per hero) are generated from legends below and only appear once you've pulled that hero. tier: early / core / late = suggested buying order (economy, then global attack speed and health, then specialisations).",
-  "branches": [
-    "Economy",
-    "Hive",
-    "Helpers",
-    "Legends"
-  ],
+  "note": "Mastery tree, drawn as a honeycomb graph growing out of the Heartseed. Six branches, one per direction. cost[i] = Mastery for rank i+1. effect = what each rank adds. parent = node that must have at least 1 rank first (no parent = grows straight from the Heartseed). tier: early / core / late = suggested buying order. Legends nodes (one per hero) come from legends below and unlock when you pull that hero.",
+  "branches": {
+    "Economy": { "color": "#f2c94c", "angle": 180, "blurb": "More gold, more shop" },
+    "Brood":   { "color": "#ff9f43", "angle": -120,  "blurb": "Combs that hatch free packs over time" },
+    "Fortune": { "color": "#c084fc", "angle": -60,  "blurb": "Rarer pulls, foil and holo variants" },
+    "Helpers": { "color": "#60a5fa", "angle": 60,   "blurb": "Upgrades for your whole team" },
+    "Legends": { "color": "#f87171", "angle": 0,   "blurb": "One node per hero you've pulled" },
+    "Hive":    { "color": "#b8e986", "angle": 120,  "blurb": "Heartseed and Stinger" }
+  },
   "nodes": {
-    "gold": {
-      "branch": "Economy",
-      "name": "Deeper Pockets",
-      "desc": "+1 gold to spend in the shop each run",
-      "cost": [
-        15,
-        45,
-        110
-      ],
-      "effect": {
-        "maxGold": 1
-      },
-      "tier": "early"
-    },
-    "reroll": {
-      "branch": "Economy",
-      "name": "Lucky Shopper",
-      "desc": "+1 free shop reroll each run",
-      "cost": [
-        20,
-        60
-      ],
-      "effect": {
-        "freeRerolls": 1
-      },
-      "tier": "core"
-    },
-    "boxes": {
-      "branch": "Economy",
-      "name": "Booster Boxes",
-      "desc": "Boxes (4 packs for 3 gold) appear in the shop",
-      "cost": [
-        40
-      ],
-      "effect": {},
-      "requires": "gold",
-      "tier": "core"
-    },
-    "grovePacks": {
-      "branch": "Economy",
-      "name": "Grove Packs",
-      "desc": "Better-odds Grove Packs join the shop",
-      "cost": [
-        80
-      ],
-      "effect": {},
-      "requires": "boxes",
-      "tier": "late"
-    },
-    "husk": {
-      "branch": "Hive",
-      "name": "Thick Husk",
-      "desc": "+15% Heartseed health",
-      "cost": [
-        10,
-        20,
-        35,
-        55,
-        80
-      ],
-      "effect": {
-        "seedHpMult": 0.15
-      },
-      "tier": "early"
-    },
-    "stinger": {
-      "branch": "Hive",
-      "name": "Sharper Stinger",
-      "desc": "+25% Stinger damage",
-      "cost": [
-        10,
-        20,
-        35,
-        55,
-        80
-      ],
-      "effect": {
-        "stingerDmgMult": 0.25
-      },
-      "tier": "early"
-    },
-    "quickSting": {
-      "branch": "Hive",
-      "name": "Quick Sting",
-      "desc": "+15% Stinger speed",
-      "cost": [
-        25,
-        50,
-        90
-      ],
-      "effect": {
-        "stingerSpeedMult": 0.15
-      },
-      "requires": "stinger",
-      "tier": "core"
-    },
-    "wideSting": {
-      "branch": "Hive",
-      "name": "Wide Sting",
-      "desc": "+15% Stinger circle size",
-      "cost": [
-        20,
-        45,
-        85
-      ],
-      "effect": {
-        "stingerRadiusMult": 0.15
-      },
-      "requires": "stinger",
-      "tier": "core"
-    },
-    "harvest": {
-      "branch": "Hive",
-      "name": "Harvest",
-      "desc": "+20% Mastery from runs",
-      "cost": [
-        30,
-        70,
-        130
-      ],
-      "effect": {
-        "masteryMult": 0.2
-      },
-      "tier": "core"
-    },
-    "kinship": {
-      "branch": "Helpers",
-      "name": "Kinship",
-      "desc": "All helpers +10% attack speed",
-      "cost": [
-        15,
-        35,
-        70
-      ],
-      "effect": {
-        "helperSpeedMult": 0.1
-      },
-      "tier": "early"
-    },
-    "commonKin": {
-      "branch": "Helpers",
-      "name": "Common Folk",
-      "desc": "Common helpers +15% damage (you'll pull these most)",
-      "cost": [
-        10,
-        25,
-        50
-      ],
-      "effect": {
-        "commonDmg": 0.15
-      },
-      "tier": "early"
-    },
-    "webLore": {
-      "branch": "Helpers",
-      "name": "Web Lore",
-      "desc": "Web lasts +0.5 s and slows +5% more",
-      "cost": [
-        20,
-        45,
-        85
-      ],
-      "effect": {
-        "webSec": 0.5,
-        "webSlow": 0.05
-      },
-      "tier": "core"
-    },
-    "emberLore": {
-      "branch": "Helpers",
-      "name": "Ember Lore",
-      "desc": "Burn and Wildfire deal +20% damage",
-      "cost": [
-        20,
-        45,
-        85
-      ],
-      "effect": {
-        "burnMult": 0.2
-      },
-      "tier": "core"
-    },
-    "swarmLore": {
-      "branch": "Helpers",
-      "name": "Swarm Lore",
-      "desc": "Swarm bonus +3% attack speed per Swarm ally",
-      "cost": [
-        20,
-        45,
-        85
-      ],
-      "effect": {
-        "swarmPerAlly": 0.03
-      },
-      "tier": "core"
-    },
-    "luckyRip": {
-      "branch": "Economy",
-      "name": "Lucky Rip",
-      "desc": "+10% chance a pack holds a bonus card",
-      "cost": [
-        25,
-        55,
-        100
-      ],
-      "effect": {
-        "bonusCardChance": 0.1
-      },
-      "tier": "early"
-    },
-    "keen": {
-      "branch": "Helpers",
-      "name": "Keen Mandibles",
-      "desc": "Helpers +5% chance to crit for double damage",
-      "cost": [
-        30,
-        60,
-        110
-      ],
-      "effect": {
-        "critChance": 0.05
-      },
-      "tier": "core"
-    },
-    "bounce": {
-      "branch": "Helpers",
-      "name": "Ricochet",
-      "desc": "Ranged helpers' shots bounce to 1 more enemy (60% damage)",
-      "cost": [
-        45,
-        110
-      ],
-      "effect": {
-        "bounces": 1
-      },
-      "tier": "core"
-    },
-    "sapFlow": {
-      "branch": "Hive",
-      "name": "Sap Flow",
-      "desc": "Heartseed heals 1 HP per kill",
-      "cost": [
-        25,
-        55,
-        100
-      ],
-      "effect": {
-        "healPerKill": 1
-      },
-      "tier": "core"
-    },
-    "regrowth": {
-      "branch": "Hive",
-      "name": "Regrowth",
-      "desc": "Heartseed regrows 1 HP per second",
-      "cost": [
-        35,
-        75,
-        130
-      ],
-      "effect": {
-        "seedRegen": 1
-      },
-      "requires": "husk",
-      "tier": "core"
-    },
-    "markedPrey": {
-      "branch": "Helpers",
-      "name": "Marked Prey",
-      "desc": "Bosses take +10% damage",
-      "cost": [
-        60,
-        120,
-        200
-      ],
-      "effect": {
-        "bossVuln": 0.1
-      },
-      "tier": "late"
-    }
+    "gold":       { "branch": "Economy", "icon": "🪙", "name": "Deeper Pockets", "desc": "+1 gold to spend in the shop each run", "cost": [15, 45, 110], "effect": { "maxGold": 1 }, "tier": "early" },
+    "reroll":     { "branch": "Economy", "icon": "🎲", "name": "Lucky Shopper", "desc": "+1 free shop reroll each run", "cost": [20, 60], "effect": { "freeRerolls": 1 }, "parent": "gold", "tier": "core" },
+    "harvest":    { "branch": "Economy", "icon": "🌾", "name": "Harvest", "desc": "+20% Mastery from runs", "cost": [30, 70, 130], "effect": { "masteryMult": 0.2 }, "parent": "gold", "tier": "core" },
+    "boxes":      { "branch": "Economy", "icon": "📦", "name": "Booster Boxes", "desc": "Boxes (4 packs for 3 gold) appear in the shop", "cost": [40], "effect": {}, "parent": "gold", "tier": "core" },
+    "grovePacks": { "branch": "Economy", "icon": "🌳", "name": "Grove Packs", "desc": "Better-odds Grove Packs join the shop", "cost": [80], "effect": {}, "parent": "boxes", "tier": "late" },
+    "stall":      { "branch": "Economy", "icon": "🏪", "name": "Wider Stall", "desc": "+1 shop slot", "cost": [60, 150], "effect": { "offerSlots": 1 }, "parent": "reroll", "tier": "late" },
+
+    "comb":       { "branch": "Brood", "icon": "🥚", "name": "Brood Comb", "desc": "A comb that hatches a free Meadow Pack every few minutes, even while you're away", "cost": [20], "effect": { "combs": 1 }, "tier": "early" },
+    "warmBrood":  { "branch": "Brood", "icon": "🔆", "name": "Warm Brood", "desc": "Combs hatch 15% faster", "cost": [25, 50, 90], "effect": { "hatchSpeed": 0.15 }, "parent": "comb", "tier": "core" },
+    "extraComb":  { "branch": "Brood", "icon": "🍯", "name": "Extra Comb", "desc": "+1 brood comb", "cost": [50, 120], "effect": { "combs": 1 }, "parent": "comb", "tier": "core" },
+    "twinEggs":   { "branch": "Brood", "icon": "🐣", "name": "Twin Eggs", "desc": "+20% chance a hatch gives 2 packs", "cost": [40, 90], "effect": { "twinChance": 0.2 }, "parent": "warmBrood", "tier": "core" },
+    "royalJelly": { "branch": "Brood", "icon": "👑", "name": "Royal Jelly", "desc": "+25% chance a hatch is a Grove Pack instead", "cost": [70, 150], "effect": { "jellyChance": 0.25 }, "parent": "extraComb", "tier": "late" },
+
+    "luckyRip":   { "branch": "Fortune", "icon": "🍀", "name": "Lucky Rip", "desc": "+10% chance a pack holds a bonus card", "cost": [25, 55, 100], "effect": { "bonusCardChance": 0.1 }, "tier": "early" },
+    "nectar":     { "branch": "Fortune", "icon": "🌸", "name": "Sweet Nectar", "desc": "Rare, Epic and Legendary pulls +15% more likely", "cost": [30, 65, 120], "effect": { "rarityBoost": 0.15 }, "parent": "luckyRip", "tier": "core" },
+    "goldenHour": { "branch": "Fortune", "icon": "🌟", "name": "Golden Hour", "desc": "Legendary pulls +50% more likely", "cost": [90, 180], "effect": { "legendaryBoost": 0.5 }, "parent": "nectar", "tier": "late" },
+    "gilded":     { "branch": "Fortune", "icon": "✨", "name": "Gilded Wings", "desc": "+4% chance a card is Foil (+20% damage)", "cost": [30, 60, 110], "effect": { "foilChance": 0.04 }, "parent": "luckyRip", "tier": "core" },
+    "prismatic":  { "branch": "Fortune", "icon": "🌈", "name": "Prismatic Shell", "desc": "+2% chance a card is Holo (+45% damage)", "cost": [70, 140, 240], "effect": { "holoChance": 0.02 }, "parent": "gilded", "tier": "late" },
+
+    "kinship":    { "branch": "Helpers", "icon": "🤝", "name": "Kinship", "desc": "All helpers +10% attack speed", "cost": [15, 35, 70], "effect": { "helperSpeedMult": 0.1 }, "tier": "early" },
+    "keen":       { "branch": "Helpers", "icon": "🎯", "name": "Keen Mandibles", "desc": "Helpers +5% chance to crit for double damage", "cost": [30, 60, 110], "effect": { "critChance": 0.05 }, "parent": "kinship", "tier": "core" },
+    "bounce":     { "branch": "Helpers", "icon": "↪️", "name": "Ricochet", "desc": "Ranged helpers' shots bounce to 1 more enemy (60% damage)", "cost": [45, 110], "effect": { "bounces": 1 }, "parent": "keen", "tier": "core" },
+    "markedPrey": { "branch": "Helpers", "icon": "💀", "name": "Marked Prey", "desc": "Bosses take +10% damage", "cost": [60, 120, 200], "effect": { "bossVuln": 0.1 }, "parent": "keen", "tier": "late" },
+    "commonKin":  { "branch": "Helpers", "icon": "🐜", "name": "Common Folk", "desc": "Common helpers +15% damage (you'll pull these most)", "cost": [10, 25, 50], "effect": { "commonDmg": 0.15 }, "parent": "kinship", "tier": "early" },
+    "webLore":    { "branch": "Helpers", "icon": "🕸️", "name": "Web Lore", "desc": "Web lasts +0.5 s and slows +5% more", "cost": [20, 45, 85], "effect": { "webSec": 0.5, "webSlow": 0.05 }, "parent": "commonKin", "tier": "core" },
+    "emberLore":  { "branch": "Helpers", "icon": "🔥", "name": "Ember Lore", "desc": "Burn and Wildfire deal +20% damage", "cost": [20, 45, 85], "effect": { "burnMult": 0.2 }, "parent": "commonKin", "tier": "core" },
+    "swarmLore":  { "branch": "Helpers", "icon": "🐝", "name": "Swarm Lore", "desc": "Swarm bonus +3% attack speed per Swarm ally", "cost": [20, 45, 85], "effect": { "swarmPerAlly": 0.03 }, "parent": "commonKin", "tier": "core" },
+
+    "stinger":    { "branch": "Hive", "icon": "🗡️", "name": "Sharper Stinger", "desc": "+25% Stinger damage", "cost": [10, 20, 35, 55, 80], "effect": { "stingerDmgMult": 0.25 }, "tier": "early" },
+    "quickSting": { "branch": "Hive", "icon": "⚡", "name": "Quick Sting", "desc": "+15% Stinger speed", "cost": [25, 50, 90], "effect": { "stingerSpeedMult": 0.15 }, "parent": "stinger", "tier": "core" },
+    "wideSting":  { "branch": "Hive", "icon": "⭕", "name": "Wide Sting", "desc": "+15% Stinger circle size", "cost": [20, 45, 85], "effect": { "stingerRadiusMult": 0.15 }, "parent": "stinger", "tier": "core" },
+    "husk":       { "branch": "Hive", "icon": "🛡️", "name": "Thick Husk", "desc": "+15% Heartseed health", "cost": [10, 20, 35, 55, 80], "effect": { "seedHpMult": 0.15 }, "tier": "early" },
+    "sapFlow":    { "branch": "Hive", "icon": "💧", "name": "Sap Flow", "desc": "Heartseed heals 1 HP per kill", "cost": [25, 55, 100], "effect": { "healPerKill": 1 }, "parent": "husk", "tier": "core" },
+    "regrowth":   { "branch": "Hive", "icon": "🌱", "name": "Regrowth", "desc": "Heartseed regrows 1 HP per second", "cost": [35, 75, 130], "effect": { "seedRegen": 1 }, "parent": "sapFlow", "tier": "core" }
   },
   "legends": {
-    "note": "One node per hero: +20% damage per rank. Specialist pick: only pays off when you pull that hero.",
-    "cost": [
-      25,
-      60,
-      120
-    ],
-    "dmgPerRank": 0.2
+    "note": "One node per hero: +20% damage per rank. Unlocks once you've pulled that hero. parents only shape the drawing (the Ant at the root, rarer heroes further out).",
+    "cost": [25, 60, 120],
+    "dmgPerRank": 0.2,
+    "icons": { "ant": "🐜", "orbweaver": "🕷️", "firefly": "🏮", "bee": "🐝", "bombardier": "💥", "trapdoor": "🕳️", "stag": "🪲", "mantis": "🦗" },
+    "parents": { "bee": "ant", "orbweaver": "ant", "firefly": "ant", "stag": "bee", "trapdoor": "orbweaver", "mantis": "trapdoor", "bombardier": "firefly" }
   }
 }
