@@ -65,6 +65,7 @@ export class BattleScene extends Phaser.Scene {
     const q = new URLSearchParams(location.search);
     this.enemies = []; this.heroes = Array.from({ length: TUNING.maxHelpers }, () => null);
     this.maxSeedHp = TUNING.seedHp * this.meta.seedHpMult;
+    Enemy.webSlowBonus = this.meta.webSlow;
     this.seedHp = this.maxSeedHp;
     this.spawnDebt = 0; this.nextSurge = TUNING.run.surgeEverySec; this.boss = null; this.bossSpawned = false;
     this.bossTongue = 0; this.bossFlop = 0; this.traps = [];
@@ -156,8 +157,8 @@ export class BattleScene extends Phaser.Scene {
         if (h.def.range <= TUNING.meleeHoldRange && !target.def.boss) target.heldUntil = this.time_ + 0.25;
       }
       if (!target || h.cooldown > 0) continue;
-      let aps = h.def.attacksPerSec;
-      if (h.def.tag === 'swarm') aps *= 1 + TUNING.swarmSpeedPerAlly * (swarm - 1);
+      let aps = h.def.attacksPerSec * this.meta.helperSpeedMult;
+      if (h.def.tag === 'swarm') aps *= 1 + (TUNING.swarmSpeedPerAlly + this.meta.swarmPerAlly) * (swarm - 1);
       h.cooldown = 1 / aps;
       this.shoot(h, target);
     }
@@ -218,19 +219,33 @@ export class BattleScene extends Phaser.Scene {
           : target.alive ? [target] : [];
         if (h.def.splash) this.ring(target.x, target.y, h.def.splash, color);
         for (const e of hit) this.applyHit(h, e);
+        // Ricochet: ranged single-target shots bounce on to nearby enemies.
+        if (!h.def.splash && h.def.range >= 150) {
+          let from = target; const done = new Set([target]);
+          for (let k = 0; k < this.meta.bounces; k++) {
+            const next = this.enemies.find(e => e.alive && !done.has(e) && (h.def.hitsAir || !e.def.flying) && Math.hypot(e.x - from.x, e.y - from.y) < 130);
+            if (!next) break;
+            const line = this.add.line(0, 0, from.x, from.y, next.x, next.y, color).setOrigin(0).setLineWidth(2).setDepth(4);
+            this.tweens.add({ targets: line, alpha: 0, duration: 200, onComplete: () => line.destroy() });
+            this.applyHit(h, next, 0.6);
+            done.add(next); from = next;
+          }
+        }
       },
     });
   }
 
-  applyHit(h: Hero, e: Enemy) {
+  applyHit(h: Hero, e: Enemy, mult = 1) {
+    if (!e.alive) return;
     const d = h.def;
-    let dmg = h.damage;
+    let dmg = mult * h.damage * (1 + (d.rarity === 'common' ? this.meta.commonDmg : 0) + (this.meta.heroDmg[h.id] ?? 0));
+    if (Math.random() < this.meta.critChance) { dmg *= 2; this.floatText(e.x, e.y - 32, 'CRIT', '#ffd76e'); }
     if (d.tag === 'swarm' && e.webbed) dmg *= 1 + TUNING.feastBonus; // Feast
     if (d.damageType === 'fire' && e.webbed) this.wildfire(e); // Wildfire
     this.damage(e, dmg, d.damageType);
     if (!e.alive) return;
-    if (d.webSec) e.webUntil = this.time_ + d.webSec;
-    if (d.burnSec) { e.burnUntil = this.time_ + d.burnSec; e.burnDps = Math.max(d.burnDps ?? 0, e.burning ? e.burnDps : 0); }
+    if (d.webSec) e.webUntil = this.time_ + d.webSec + this.meta.webSec;
+    if (d.burnSec) { e.burnUntil = this.time_ + d.burnSec; e.burnDps = Math.max((d.burnDps ?? 0) * this.meta.burnMult, e.burning ? e.burnDps : 0); }
     if (d.sunderSec) e.sunderUntil = this.time_ + d.sunderSec;
     if (d.executeBelow && !e.def.boss && (e.webbed || e.burning) && e.hp / e.def.hp < d.executeBelow) {
       this.stats.executes++;
@@ -247,8 +262,8 @@ export class BattleScene extends Phaser.Scene {
     this.floatText(origin.x, origin.y - 34, 'WILDFIRE!', '#ff8a2a');
     for (const e of this.enemies) {
       if (!e.alive || Math.hypot(e.x - origin.x, e.y - origin.y) > wf.radius) continue;
-      this.damage(e, wf.burst, 'fire');
-      if (e.alive) { e.burnUntil = this.time_ + wf.burnSec; e.burnDps = Math.max(e.burnDps, wf.burnDps); }
+      this.damage(e, wf.burst * this.meta.burnMult, 'fire');
+      if (e.alive) { e.burnUntil = this.time_ + wf.burnSec; e.burnDps = Math.max(e.burnDps, wf.burnDps * this.meta.burnMult); }
     }
   }
 
@@ -259,6 +274,7 @@ export class BattleScene extends Phaser.Scene {
       const armor = e.sundered ? e.def.armor * (1 - TUNING.sunderArmorCut) : e.def.armor;
       amount *= 1 - armor;
     }
+    if (e.def.boss) amount *= 1 + this.meta.bossVuln;
     e.hp -= amount;
     if (showNumber) this.floatText(e.x + Phaser.Math.Between(-8, 8), e.y - 20, String(Math.round(amount)), type === 'fire' ? '#ffb070' : '#ffffff');
     if (e.hp <= 0) this.kill(e);
@@ -267,6 +283,7 @@ export class BattleScene extends Phaser.Scene {
   kill(e: Enemy) {
     if (!e.alive) return;
     this.stats.kills++;
+    this.seedHp = Math.min(this.maxSeedHp, this.seedHp + this.meta.healPerKill);
     e.destroy();
   }
 
@@ -406,6 +423,7 @@ export class BattleScene extends Phaser.Scene {
     }
     this.enemies = this.enemies.filter(e => e.alive);
 
+    this.seedHp = Math.min(this.maxSeedHp, this.seedHp + this.meta.seedRegen * dt);
     if (this.seedHp <= 0) { this.seedHp = 0; this.end('lost'); }
     this.seedBody.setFillStyle(this.enemies.some(e => e.atSeed) && Math.sin(this.time_ * 20) > 0 ? 0xd9f0c8 : 0x9be36d);
   }

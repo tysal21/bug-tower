@@ -7,10 +7,11 @@ export interface SaveData {
   runs: number;
   bestTime: number;
   bossKills: number;
+  pulled: string[]; // every hero you've ever pulled (feeds Legends nodes and the future Collection)
 }
 
 export function freshSave(): SaveData {
-  return { mastery: 0, nodes: {}, runs: 0, bestTime: 0, bossKills: 0 };
+  return { mastery: 0, nodes: {}, runs: 0, bestTime: 0, bossKills: 0, pulled: [] };
 }
 
 export function loadSave(): SaveData {

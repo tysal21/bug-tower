@@ -3,6 +3,8 @@ import { EnemyDef, TUNING } from './data';
 
 /** An enemy that wanders toward the seed, pushing apart from its neighbours. */
 export class Enemy {
+  /** Extra web slow from the skill tree (set by the battle scene). */
+  static webSlowBonus = 0;
   hp: number;
   maxHp: number;
   alive = true;
@@ -66,7 +68,7 @@ export class Enemy {
     if (dist > this.stopDist + 1 && this.heldUntil <= now) {
       // Head for the seed, drifting side to side so they don't march in straight lines.
       const angle = Math.atan2(dy, dx) + Math.sin(now * this.wobbleSpeed + this.wobblePhase) * this.wobbleAmount * Math.min(1, dist / 250);
-      const slow = this.webbed ? 1 - TUNING.webSlow : 1;
+      const slow = this.webbed ? 1 - Math.min(0.8, TUNING.webSlow + Enemy.webSlowBonus) : 1;
       let vx = Math.cos(angle) * this.def.speed * slow * this.speedMult;
       let vy = Math.sin(angle) * this.def.speed * slow * this.speedMult;
       // Separation: push away from neighbours of the same layer (ground or air).

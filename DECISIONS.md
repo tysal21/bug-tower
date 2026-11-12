@@ -2,6 +2,15 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-12 (Skill tree v2, from Tyler's two meta-progression guides)
+- **Targeted over generic:** new **Helpers** branch upgrades the roster: Kinship (all helpers attack speed), Common Folk (common helpers damage), Web / Ember / Swarm Lore (one per combo tag), Keen Mandibles (crits), Ricochet (ranged shots bounce), Marked Prey (bosses take more damage).
+- **Grows with the collection:** **Legends** branch has one node per hero (+20% damage per rank), and a hero's node only appears once you've pulled it. Flagged in-game as a specialist pick, because of the randomness trap: early Mastery is safer in versatile nodes.
+- **Priority order (Tyler's roadmap):** every node is tagged Buy early / Core / Late game and sorted that way. Early = Deeper Pockets, Lucky Rip (bonus card chance), Thick Husk, Kinship, Sharper Stinger, Common Folk.
+- **New Hive nodes:** Sap Flow (seed heals per kill), Regrowth (seed regenerates).
+- **Free "Refund all Mastery"** while costs are still being tuned (per the guide's note that layouts and costs change pre-release).
+- **Not yet:** spell cooldown nodes (no spells yet), gold interest between runs (late luxury), helper health (helpers can't be hurt yet), quest nodes.
+- Save now tracks every hero pulled (`pulled`), which will also feed the Collection.
+
 ## 2026-11-12 (Phase 2, the real game loop, Tyler's spec)
 - **Loop:** the very first run is Stinger only and ends in ~20 s. When the seed falls, a menu opens with tabs: Shop, Skill Tree, Collection (placeholder). Spend Mastery in the tree, spend gold in the shop, open packs, build a team, start the next run. Runs get longer as you upgrade.
 - **Gold:** a fixed budget that refills every run. Start at 1 gold; "Deeper Pockets" adds +1 per rank. Meadow Pack = 1 gold (1 card). Booster Box = 4 packs for 3 gold (unlocked in the tree). Grove Pack = 2 gold, better odds (unlocked later, mixes into the shop).

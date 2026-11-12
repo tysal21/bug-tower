@@ -1,6 +1,6 @@
 // The between-runs menu: Shop, Skill Tree and (later) Collection. Plain HTML over the game canvas.
 import { HEROES, TUNING, TAG_COLOR } from '../game/data';
-import { SHOP, TREE, metaStats, nodeUnlocked, rollCard, rollOffers } from '../meta/meta';
+import { SHOP, TREE, metaStats, nodeUnlocked, nodeVisible, refundAll, rollCard, rollOffers } from '../meta/meta';
 import { SaveData, writeSave, resetSave, freshSave } from '../meta/save';
 import type { TeamMember } from '../scenes/BattleScene';
 
@@ -55,7 +55,11 @@ export class Menu {
     if (this.gold < item.cost) return;
     this.gold -= item.cost;
     this.offers[slot] = null;
-    for (let i = 0; i < item.packs; i++) this.queue.push(rollCard(item.packType));
+    const bonus = metaStats(this.save).bonusCardChance;
+    for (let i = 0; i < item.packs; i++) {
+      this.queue.push(rollCard(item.packType));
+      if (Math.random() < bonus) this.queue.push(rollCard(item.packType)); // Lucky Rip
+    }
     this.render();
   }
 
@@ -146,7 +150,9 @@ export class Menu {
 
   treeHtml() {
     const cols = TREE.branches.map(branch => {
-      const nodes = Object.entries(TREE.nodes).filter(([, n]) => n.branch === branch).map(([id, n]) => {
+      const order = { early: 0, core: 1, late: 2 };
+      const nodes = Object.entries(TREE.nodes).filter(([id, n]) => n.branch === branch && nodeVisible(this.save, id))
+        .sort(([, a], [, b]) => order[a.tier ?? 'core'] - order[b.tier ?? 'core']).map(([id, n]) => {
         const rank = this.save.nodes[id] ?? 0;
         const max = n.cost.length;
         const cost = n.cost[rank];
@@ -156,15 +162,21 @@ export class Menu {
           : `<button data-node="${id}" ${this.save.mastery >= cost ? '' : 'disabled'}>${cost} Mastery</button>`;
         return `<div class="node ${rank ? 'owned' : ''} ${unlocked ? '' : 'locked'}">
           <div class="node-top"><b>${n.name}</b><span class="rank">${rank}/${max}</span></div>
+          <span class="tier ${n.tier ?? 'core'}">${{ early: 'Buy early', core: 'Core', late: 'Late game' }[n.tier ?? 'core']}</span>
           <div class="muted">${n.desc}</div>${btn}</div>`;
       }).join('');
-      return `<div class="branch"><h2>${branch}</h2>${nodes}</div>`;
+      const hint = branch === 'Legends'
+        ? `<p class="muted small">One node per hero you've pulled. Specialist picks: they only pay off when that hero shows up, so early Mastery is safer in Helpers.</p>`
+        : branch === 'Helpers' ? `<p class="muted small">Versatile: these help most teams.</p>` : '';
+      return `<div class="branch"><h2>${branch}</h2>${hint}${nodes || '<p class="muted small">Pull heroes to unlock nodes here.</p>'}</div>`;
     }).join('');
     return `
       <section class="tree">
         <div class="gold">Mastery <b>${this.save.mastery}</b></div>
+        <p class="muted small">Suggested order: economy first, then attack speed and seed health, then specialisations.</p>
         <div class="branches">${cols}</div>
-        <p class="muted small">Quest nodes and hero-specific (Legends) upgrades come next.</p>
+        <p class="muted small">Quest nodes come next. Costs are still being tuned, so refunds are free for now.</p>
+        <button class="secondary" data-refund>Refund all Mastery</button>
         <button class="link" data-reset>Reset all progress</button>
       </section>`;
   }
@@ -202,7 +214,17 @@ export class Menu {
     q<HTMLButtonElement>('[data-reroll]').forEach(b => b.onclick = () => this.reroll());
     q<HTMLButtonElement>('[data-node]').forEach(b => b.onclick = () => this.buyNode(b.dataset.node!));
     q<HTMLButtonElement>('[data-start]').forEach(b => b.onclick = () => { this.close(); this.onStart(this.team); });
+    q<HTMLButtonElement>('[data-refund]').forEach(b => b.onclick = () => {
+      const before = metaStats(this.save);
+      refundAll(this.save); writeSave(this.save);
+      const after = metaStats(this.save);
+      this.gold = Math.max(0, this.gold - (before.maxGold - after.maxGold));
+      this.rerolls = Math.max(0, this.rerolls - (before.freeRerolls - after.freeRerolls));
+      this.render();
+    });
     q<HTMLDivElement>('[data-card]').forEach(c => c.onclick = () => {
+      const id = this.queue[0];
+      if (!this.save.pulled.includes(id)) { this.save.pulled.push(id); writeSave(this.save); }
       c.classList.add('flipped');
       this.root.querySelector<HTMLElement>('.reveal-actions')!.hidden = false;
     });
