@@ -21,7 +21,8 @@ Useful extras: add `?speed=3` to the address to run the game 3x faster, `?test` 
 - `src/data/*.json` - all the game numbers (heroes, enemies, tuning incl. the spawn ramp and boss). Change balance here.
 - `src/scenes/BattleScene.ts` - the battle: spawn ramp, Frog King, helpers, combos, packs, the Stinger.
 - `src/game/` - small building blocks (Hero, Enemy, data types).
-- `src/ui/menu.ts` - the between-runs menu (shop, skill tree, pack reveal).
+- `src/ui/menu.ts` - the between-runs screen (Market, brood combs, skill tree, collection, pack reveal).
+- `src/ui/treeGraph.ts` - lays the skill tree out as a honeycomb around the Heartseed.
 - `src/meta/` - saving progress, skill tree effects, shop rolls.
 - `src/data/shop.json`, `src/data/tree.json` - shop items, pack odds and skill tree nodes.
 - `.github/workflows/deploy.yml` - publishes the game to GitHub Pages when `main` changes.

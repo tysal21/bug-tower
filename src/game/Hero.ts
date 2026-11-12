@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { HeroDef, TAG_COLOR, TUNING } from './data';
+import type { Variant } from '../meta/save';
 
 export class Hero {
   cooldown = 0;
@@ -9,6 +10,7 @@ export class Hero {
   stunnedUntil = 0;
   trapTimer = 0;
   stars = 1;
+  variant: Variant = 'standard';
   body: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
   starText: Phaser.GameObjects.Text;
@@ -46,7 +48,9 @@ export class Hero {
   /** Moves the hero home position (used when it is placed or replaced). */
   setHome(x: number, y: number) { this.homeX = x; this.homeY = y; }
 
-  refresh() { this.starText.setText('★'.repeat(this.stars)); }
+  refresh() {
+    this.starText.setText('★'.repeat(this.stars) + (this.variant === 'holo' ? ' ◈' : this.variant === 'foil' ? ' ✦' : ''));
+  }
 
   destroy() {
     this.body.destroy();
