@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ENEMIES, HEROES, HERO_IDS, TUNING, WAVES, DamageType, TAG_COLOR } from '../game/data';
+import { ENEMIES, HEROES, HERO_IDS, TUNING, DamageType, TAG_COLOR } from '../game/data';
 import { Enemy } from '../game/Enemy';
 import { Hero, rarityColor } from '../game/Hero';
 import { packPrice, rollHero, starsFor } from '../game/packs';
@@ -7,14 +7,15 @@ import { packPrice, rollHero, starsFor } from '../game/packs';
 export const W = 1280;
 export const H = 720;
 const SEED = { x: 640, y: 360, r: 40 };
-const RING = 100; // distance of hero slots from the seed
-const SLOTS = Array.from({ length: TUNING.heroSlots }, (_, i) => {
-  const a = -Math.PI / 2 + (i * Math.PI * 2) / TUNING.heroSlots;
-  return { x: SEED.x + Math.cos(a) * RING, y: SEED.y + Math.sin(a) * RING };
-});
+/** Where a helper idles when nothing is near: spread around the seed. */
+function homeFor(i: number) {
+  const a = -Math.PI / 2 + (i * Math.PI * 2) / TUNING.maxHelpers + 0.3;
+  const r = 85 + (i % 2) * 35;
+  return { x: SEED.x + Math.cos(a) * r, y: SEED.y + Math.sin(a) * r };
+}
 const RARITY_HEX: Record<string, string> = { common: '#bbbbbb', rare: '#5b9cff', epic: '#c084fc', legendary: '#ffc83d' };
 
-interface Spawn { at: number; enemy: string; side: 'edge' | 'air' }
+interface Trap { x: number; y: number; r: number; until: number; gfx: Phaser.GameObjects.Arc }
 
 export class BattleScene extends Phaser.Scene {
   enemies: Enemy[] = [];
@@ -22,10 +23,13 @@ export class BattleScene extends Phaser.Scene {
   seedHp = TUNING.seedHp;
   nectar = 0;
   packsBought = 0;
-  waveIndex = -1;
-  waveTime = 0;
-  schedule: Spawn[] = [];
-  breakTimer = 0;
+  spawnDebt = 0; // fractional enemies owed by the spawn ramp
+  nextSurge = 0;
+  boss: Enemy | null = null;
+  bossSpawned = false;
+  bossTongue = 0;
+  bossFlop = 0;
+  traps: Trap[] = [];
   state: 'playing' | 'won' | 'lost' = 'playing';
   paused = false; // true while a pack is being opened
   pendingHero: string | null = null; // pulled hero waiting for a slot (board full)
@@ -33,6 +37,8 @@ export class BattleScene extends Phaser.Scene {
   speed = 1;
   testMode = false;
   stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0, packs: 0 };
+  bossBar!: Phaser.GameObjects.Graphics;
+  bossLabel!: Phaser.GameObjects.Text;
 
   stingerDown = false;
   uiPress = false; // true while a press that began on a button is held
@@ -51,24 +57,28 @@ export class BattleScene extends Phaser.Scene {
 
   create() {
     const q = new URLSearchParams(location.search);
-    this.enemies = []; this.heroes = SLOTS.map(() => null);
+    this.enemies = []; this.heroes = Array.from({ length: TUNING.maxHelpers }, () => null);
     this.seedHp = TUNING.seedHp; this.nectar = 0; this.packsBought = 0;
-    this.waveIndex = -1; this.waveTime = 0; this.schedule = []; this.breakTimer = 1.5;
+    this.spawnDebt = 0; this.nextSurge = TUNING.run.surgeEverySec; this.boss = null; this.bossSpawned = false;
+    this.bossTongue = 0; this.bossFlop = 0; this.traps = [];
     this.state = 'playing'; this.paused = false; this.pendingHero = null; this.time_ = 0;
     this.stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0, packs: 0 };
     this.speed = Number(q.get('speed')) || 1;
     this.testMode = q.has('test');
+    // ?boss skips ahead to 5 seconds before the Frog King, for testing.
+    if (q.has('boss')) { this.time_ = TUNING.run.bossAtSec - 5; this.nextSurge = Infinity; }
     this.overlay = undefined; this.replaceUi = undefined;
 
     // Ground: a top-down meadow with a worn circle around the seed.
     this.add.rectangle(W / 2, H / 2, W, H, 0x23301c);
-    this.add.circle(SEED.x, SEED.y, TUNING.heroLeash, 0x283522); // area roaming helpers defend
+    this.add.circle(SEED.x, SEED.y, TUNING.heroLeash, 0x283522); // area helpers defend
     this.add.circle(SEED.x, SEED.y, 170, 0x2d3a22);
-    SLOTS.forEach(s => this.add.circle(s.x, s.y, 25, 0x000000, 0.25).setStrokeStyle(2, 0x4a5a38));
     this.seedBody = this.add.circle(SEED.x, SEED.y, SEED.r, 0x9be36d).setStrokeStyle(4, 0x3f6e2a).setDepth(1);
     this.add.text(SEED.x, SEED.y, 'SEED', { fontFamily: 'monospace', fontSize: '13px', color: '#1d3311' }).setOrigin(0.5).setDepth(1);
 
     this.seedBar = this.add.graphics().setDepth(9);
+    this.bossBar = this.add.graphics().setDepth(9);
+    this.bossLabel = this.add.text(W / 2, 40, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffd76e' }).setOrigin(0.5, 0).setDepth(9);
     this.hud = this.add.text(16, 12, '', { fontFamily: 'monospace', fontSize: '16px', color: '#f0e6d2' }).setDepth(9);
     this.banner = this.add.text(W / 2, 150, '', { fontFamily: 'monospace', fontSize: '40px', color: '#ffffff', align: 'center', stroke: '#000', strokeThickness: 5 })
       .setOrigin(0.5).setDepth(15);
@@ -86,7 +96,7 @@ export class BattleScene extends Phaser.Scene {
       // Presses that start on a button or overlay never sting.
       this.uiPress = over.some(o => o.active && o.scene) || this.paused;
       if (this.uiPress) return;
-      const slot = SLOTS.findIndex(s => Math.hypot(p.worldX - s.x, p.worldY - s.y) < 26);
+      const slot = this.heroes.findIndex(h => h && Math.hypot(p.worldX - h.x, p.worldY - h.y) < 24);
       if (slot >= 0 && this.pendingHero) { this.placeInSlot(slot, this.pendingHero); this.closeReplace(); return; }
       if (slot >= 0 && this.testMode) { this.cycleSlot(slot); return; }
     });
@@ -183,7 +193,7 @@ export class BattleScene extends Phaser.Scene {
     this.pendingHero = id;
     this.paused = true;
     const c = this.add.container(0, 0).setDepth(19);
-    const t = this.add.text(W / 2, 40, `Board full: tap a helper to replace it with ${HEROES[id].name}`, {
+    const t = this.add.text(W / 2, 40, `Team full: tap a helper to replace it with ${HEROES[id].name}`, {
       fontFamily: 'monospace', fontSize: '18px', color: '#fff3cf', backgroundColor: '#000000aa', padding: { x: 10, y: 6 },
     }).setOrigin(0.5, 0);
     const btn = this.add.rectangle(W / 2, H - 50, 180, 50, 0x5a2222).setStrokeStyle(2, 0xffb4b4).setInteractive({ useHandCursor: true });
@@ -203,10 +213,15 @@ export class BattleScene extends Phaser.Scene {
   }
 
   placeInSlot(slot: number, id: string) {
-    this.heroes[slot]?.destroy();
-    const s = SLOTS[slot];
-    this.heroes[slot] = id ? new Hero(this, id, HEROES[id], s.x, s.y) : null;
-    if (id) this.floatText(s.x, s.y - 34, HEROES[id].name, '#ffffff');
+    const old = this.heroes[slot];
+    old?.destroy();
+    const home = homeFor(slot);
+    // New helpers pop out of the seed (or take the replaced helper's spot) and walk home.
+    const sx = old ? old.x : SEED.x, sy = old ? old.y : SEED.y;
+    const h = id ? new Hero(this, id, HEROES[id], sx, sy) : null;
+    h?.setHome(home.x, home.y);
+    this.heroes[slot] = h;
+    if (id) this.floatText(sx, sy - 34, HEROES[id].name, '#ffffff');
   }
 
   cycleSlot(slot: number) {
@@ -220,7 +235,17 @@ export class BattleScene extends Phaser.Scene {
     const swarm = this.heroes.filter(h => h?.def.tag === 'swarm').length;
     for (const h of this.heroes) {
       if (!h) continue;
+      const stunned = h.stunnedUntil > this.time_;
+      h.body.setAlpha(stunned ? 0.35 : 1);
+      if (stunned) continue;
       h.cooldown -= dt;
+      if (h.def.trapEverySec) {
+        h.trapTimer -= dt;
+        if (h.trapTimer <= 0 && this.enemies.some(e => e.alive && Math.hypot(e.x - h.x, e.y - h.y) < 250)) {
+          h.trapTimer = h.def.trapEverySec;
+          this.layTrap(h);
+        }
+      }
       const target = h.def.moves ? this.pickRoamTarget(h) : this.pickTarget(h);
       if (h.def.moves) {
         // Roamers chase enemies near the seed, then walk home when the area is clear.
@@ -228,7 +253,7 @@ export class BattleScene extends Phaser.Scene {
         const inRange = h.moveToward(target.x, target.y, dt, h.def.range - 4);
         if (!inRange) continue;
         // Melee helpers pin their target in place while they fight it.
-        if (h.def.range <= TUNING.meleeHoldRange) target.heldUntil = this.time_ + 0.25;
+        if (h.def.range <= TUNING.meleeHoldRange && !target.def.boss) target.heldUntil = this.time_ + 0.25;
       }
       if (!target || h.cooldown > 0) continue;
       let aps = h.def.attacksPerSec;
@@ -236,6 +261,22 @@ export class BattleScene extends Phaser.Scene {
       h.cooldown = 1 / aps;
       this.shoot(h, target);
     }
+  }
+
+  layTrap(h: Hero) {
+    const r = h.def.trapRadius ?? 60;
+    const gfx = this.add.circle(h.x, h.y, r, 0xe8e8f0, 0.12).setStrokeStyle(2, 0xe8e8f0, 0.6).setDepth(0.5);
+    this.traps.push({ x: h.x, y: h.y, r, until: this.time_ + (h.def.trapSec ?? 8), gfx });
+  }
+
+  updateTraps() {
+    for (const t of this.traps) {
+      for (const e of this.enemies)
+        if (e.alive && !e.def.flying && Math.hypot(e.x - t.x, e.y - t.y) < t.r) e.webUntil = Math.max(e.webUntil, this.time_ + 1);
+      t.gfx.setAlpha(Math.min(1, (t.until - this.time_) / 2));
+      if (t.until <= this.time_) t.gfx.destroy();
+    }
+    this.traps = this.traps.filter(t => t.until > this.time_);
   }
 
   /** Stationary helpers: the enemy in range that is closest to the seed. */
@@ -291,7 +332,7 @@ export class BattleScene extends Phaser.Scene {
     if (d.webSec) e.webUntil = this.time_ + d.webSec;
     if (d.burnSec) { e.burnUntil = this.time_ + d.burnSec; e.burnDps = Math.max(d.burnDps ?? 0, e.burning ? e.burnDps : 0); }
     if (d.sunderSec) e.sunderUntil = this.time_ + d.sunderSec;
-    if (d.executeBelow && (e.webbed || e.burning) && e.hp / e.def.hp < d.executeBelow) {
+    if (d.executeBelow && !e.def.boss && (e.webbed || e.burning) && e.hp / e.def.hp < d.executeBelow) {
       this.stats.executes++;
       this.floatText(e.x, e.y - 30, 'EXECUTE', '#f5b301');
       this.kill(e);
@@ -354,40 +395,89 @@ export class BattleScene extends Phaser.Scene {
     this.ring(best.x, best.y, 16, 0xff4d6d);
   }
 
-  // ---------- waves ----------
-  startWave(i: number) {
-    this.waveIndex = i;
-    this.waveTime = 0;
-    this.schedule = [];
-    for (const g of WAVES[i].groups)
-      for (let n = 0; n < g.count; n++) this.schedule.push({ at: (g.delay ?? 0) + n * g.every, enemy: g.enemy, side: g.side });
-    this.schedule.sort((a, b) => a.at - b.at);
-    this.showBanner(`Wave ${i + 1}`);
+  // ---------- spawning: a steady ramp, surges, then the boss ----------
+  pickEnemy(): string {
+    const mix = TUNING.run.mix.filter(m => this.time_ >= m.fromSec);
+    let r = Math.random() * mix.reduce((a, m) => a + m.weight, 0);
+    for (const m of mix) { if (r < m.weight) return m.enemy; r -= m.weight; }
+    return 'grub';
   }
 
   /** Spawns just outside a random point on the screen edge. */
-  spawn(s: Spawn) {
-    const def = ENEMIES[s.enemy];
-    const m = 30;
-    const per = 2 * (W + H);
-    let t = Math.random() * per;
+  spawn(enemy: string) {
+    const def = ENEMIES[enemy];
+    const m = 30 + def.size;
+    let t = Math.random() * 2 * (W + H);
     let x: number, y: number;
     if (t < W) { x = t; y = -m; }
     else if ((t -= W) < H) { x = W + m; y = t; }
     else if ((t -= H) < W) { x = W - t; y = H + m; }
     else { t -= W; x = -m; y = H - t; }
-    this.enemies.push(new Enemy(this, s.enemy, def, x, y, SEED.x, SEED.y, SEED.r));
+    const hpScale = def.boss ? 1 : 1 + TUNING.run.hpGrowthPerMin * (this.time_ / 60);
+    const e = new Enemy(this, enemy, def, x, y, SEED.x, SEED.y, SEED.r, hpScale);
+    this.enemies.push(e);
+    return e;
   }
 
-  updateWaves(dt: number) {
-    if (this.waveIndex >= 0) {
-      this.waveTime += dt;
-      while (this.schedule.length && this.schedule[0].at <= this.waveTime) this.spawn(this.schedule.shift()!);
+  updateSpawns(dt: number) {
+    const run = TUNING.run;
+    const progress = Math.min(1, this.time_ / run.bossAtSec);
+    let rate = run.spawnPerSecStart + (run.spawnPerSecEnd - run.spawnPerSecStart) * progress;
+    if (this.bossSpawned) rate *= run.spawnRateDuringBoss;
+    this.spawnDebt += rate * dt;
+    while (this.spawnDebt >= 1) { this.spawnDebt--; this.spawn(this.pickEnemy()); }
+    if (!this.bossSpawned && this.time_ >= this.nextSurge) {
+      this.nextSurge += run.surgeEverySec;
+      this.showBanner('Swarm incoming!');
+      for (let i = 0; i < run.surgeSize; i++) this.spawn(this.pickEnemy());
     }
-    if (this.schedule.length || this.enemies.some(e => e.alive)) return;
-    if (this.waveIndex === WAVES.length - 1) { this.end('won'); return; }
-    this.breakTimer -= dt;
-    if (this.breakTimer <= 0) { this.breakTimer = TUNING.secondsBetweenWaves; this.startWave(this.waveIndex + 1); }
+    if (!this.bossSpawned && this.time_ >= run.bossAtSec) {
+      this.bossSpawned = true;
+      this.boss = this.spawn('frogking');
+      this.bossTongue = TUNING.boss.tongueEverySec;
+      this.bossFlop = TUNING.boss.flopEverySec;
+      this.showBanner('The Frog King arrives!');
+      this.cameras.main.shake(400, 0.008);
+    }
+  }
+
+  // ---------- the Frog King ----------
+  updateBoss(dt: number) {
+    const b = this.boss;
+    if (!b) return;
+    if (!b.alive) { this.boss = null; this.end('won'); return; }
+    const cfg = TUNING.boss;
+    const enraged = b.hp / b.maxHp < cfg.enrageBelow;
+    b.speedMult = enraged ? cfg.enrageSpeedMult : 1;
+    const cd = enraged ? cfg.enrageCooldownMult : 1;
+    this.bossTongue -= dt;
+    this.bossFlop -= dt;
+    if (this.bossTongue <= 0) {
+      this.bossTongue = cfg.tongueEverySec * cd;
+      // Tongue Lash: grab the nearest helper and stun it.
+      let best: Hero | null = null, bd: number = cfg.tongueRange;
+      for (const h of this.heroes) if (h) { const d = Math.hypot(h.x - b.x, h.y - b.y); if (d < bd) { bd = d; best = h; } }
+      if (best) {
+        best.stunnedUntil = this.time_ + cfg.tongueStunSec;
+        const line = this.add.line(0, 0, b.x, b.y, best.x, best.y, 0xff6b9a).setOrigin(0).setLineWidth(5).setDepth(7);
+        this.tweens.add({ targets: line, alpha: 0, duration: 500, onComplete: () => line.destroy() });
+        this.floatText(best.x, best.y - 34, 'GRABBED!', '#ff6b9a');
+      }
+    }
+    if (this.bossFlop <= 0 && !b.atSeed) {
+      this.bossFlop = cfg.flopEverySec * cd;
+      // Belly Flop: leap toward the seed, splash out grubs on landing.
+      const dx = SEED.x - b.x, dy = SEED.y - b.y, d = Math.hypot(dx, dy);
+      const hop = Math.min(cfg.flopDistance, d - b.stopDist);
+      b.x += (dx / d) * hop; b.y += (dy / d) * hop;
+      this.ring(b.x, b.y, 110, 0x7bd36b);
+      this.cameras.main.shake(200, 0.006);
+      if (Math.hypot(SEED.x - b.x, SEED.y - b.y) <= b.stopDist + 5) this.seedHp -= cfg.flopSeedDamage;
+      for (let i = 0; i < cfg.flopGrubs; i++) {
+        const g = this.spawn('grub');
+        g.x = b.x + Phaser.Math.Between(-60, 60); g.y = b.y + Phaser.Math.Between(-60, 60);
+      }
+    }
   }
 
   end(result: 'won' | 'lost') {
@@ -396,7 +486,7 @@ export class BattleScene extends Phaser.Scene {
     const s = this.stats;
     this.banner.setText(
       (result === 'won' ? 'The Heartseed survives!' : 'The Heartseed has fallen') +
-      `\nYour helpers are gone. Next run starts fresh.\n\nWave ${this.waveIndex + 1} · ${s.kills} kills · ${s.packs} packs opened\n${s.wildfires} Wildfires · ${s.executes} executes · ${s.stingerHits} stings\n\nTap to play again`,
+      `\nYour helpers are gone. Next run starts fresh.\n\nSurvived ${this.clock(this.time_)} · ${s.kills} kills · ${s.packs} packs opened\n${s.wildfires} Wildfires · ${s.executes} executes · ${s.stingerHits} stings\n\nTap to play again`,
     ).setFontSize(24).setAlpha(1);
   }
 
@@ -407,9 +497,12 @@ export class BattleScene extends Phaser.Scene {
     const dt = Math.min(deltaMs / 1000, 0.05) * this.speed;
     this.time_ += dt;
 
-    this.updateWaves(dt);
+    this.updateSpawns(dt);
+    this.updateBoss(dt);
+    if (this.state !== 'playing') return;
     this.updateStinger(dt);
     this.updateHeroes(dt);
+    this.updateTraps();
 
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -424,18 +517,32 @@ export class BattleScene extends Phaser.Scene {
   }
 
   drawHud() {
-    const wave = Math.max(this.waveIndex + 1, 1);
-    this.hud.setText(`Wave ${wave}/${WAVES.length}   Nectar ${this.nectar}   Enemies ${this.enemies.length + this.schedule.length}`);
+    const left = TUNING.run.bossAtSec - this.time_;
+    const timer = this.bossSpawned ? 'BOSS FIGHT' : `Boss in ${this.clock(left)}`;
+    this.hud.setText(`${this.clock(this.time_)}   ${timer}   Nectar ${this.nectar}   Helpers ${this.heroes.filter(Boolean).length}/${TUNING.maxHelpers}`);
+    this.bossBar.clear();
+    this.bossLabel.setText('');
+    if (this.boss?.alive) {
+      const b = this.boss, bw = 500, bx = W / 2 - bw / 2, by = 60;
+      this.bossLabel.setText(b.hp / b.maxHp < TUNING.boss.enrageBelow ? 'FROG KING (ENRAGED)' : 'FROG KING');
+      this.bossBar.fillStyle(0x000000, 0.6).fillRect(bx, by, bw, 12);
+      this.bossBar.fillStyle(0xd4af37).fillRect(bx, by, (bw * Math.max(0, b.hp)) / b.maxHp, 12);
+    }
     const price = packPrice(this.packsBought);
     const afford = this.nectar >= price;
     this.shopText.setText(`Buy pack\n${price} Nectar`);
     this.shopBtn.setFillStyle(afford ? 0x8a6420 : 0x3a3020).setStrokeStyle(3, afford ? 0xf2c94c : 0x6a5a3a);
     this.shopText.setColor(afford ? '#fff3cf' : '#8a7f6a');
-    const bw = 400, x = W / 2 - bw / 2, y = 16;
+    const bw = 300, x = W - bw - 16, y = 16; // seed health, top right
     this.seedBar.clear();
     this.seedBar.fillStyle(0x000000, 0.6).fillRect(x, y, bw, 14);
     this.seedBar.fillStyle(0x9be36d).fillRect(x, y, (bw * this.seedHp) / TUNING.seedHp, 14);
     this.seedBar.lineStyle(1, 0xf0e6d2, 0.5).strokeRect(x, y, bw, 14);
+  }
+
+  clock(sec: number) {
+    const t = Math.max(0, Math.floor(sec));
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
   }
 
   floatText(x: number, y: number, text: string, color: string) {

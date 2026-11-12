@@ -1,6 +1,5 @@
 {
-  "seedHp": 1000,
-  "heroSlots": 6,
+  "seedHp": 1500,
   "stinger": {
     "damage": 5,
     "attacksPerSec": 4,
@@ -17,10 +16,9 @@
     "burnDps": 5
   },
   "sunderArmorCut": 0.5,
-  "secondsBetweenWaves": 4,
   "packs": {
-    "firstPrice": 10,
-    "priceGrowth": 1.25,
+    "firstPrice": 8,
+    "priceGrowth": 1.2,
     "cardsPerPack": 1,
     "rarityOdds": {
       "common": 70,
@@ -35,6 +33,51 @@
     2,
     4
   ],
-  "heroLeash": 320,
-  "meleeHoldRange": 60
+  "meleeHoldRange": 60,
+  "maxHelpers": 6,
+  "heroLeash": 330,
+  "run": {
+    "note": "Enemies spawn non-stop and ramp up until bossAtSec, then the Frog King arrives. Surges are short bursts that feel like waves.",
+    "bossAtSec": 300,
+    "spawnPerSecStart": 0.35,
+    "spawnPerSecEnd": 1.1,
+    "hpGrowthPerMin": 0.1,
+    "surgeEverySec": 60,
+    "surgeSize": 8,
+    "spawnRateDuringBoss": 0.5,
+    "mix": [
+      {
+        "enemy": "grub",
+        "fromSec": 0,
+        "weight": 10
+      },
+      {
+        "enemy": "wasp",
+        "fromSec": 40,
+        "weight": 3
+      },
+      {
+        "enemy": "snail",
+        "fromSec": 90,
+        "weight": 2
+      },
+      {
+        "enemy": "wisp",
+        "fromSec": 140,
+        "weight": 2
+      }
+    ]
+  },
+  "boss": {
+    "tongueEverySec": 7,
+    "tongueRange": 320,
+    "tongueStunSec": 4,
+    "flopEverySec": 12,
+    "flopDistance": 130,
+    "flopSeedDamage": 60,
+    "flopGrubs": 5,
+    "enrageBelow": 0.5,
+    "enrageSpeedMult": 1.5,
+    "enrageCooldownMult": 0.5
+  }
 }

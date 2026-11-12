@@ -1,7 +1,6 @@
 // Typed access to the JSON data files. Change numbers in src/data/*.json, not here.
 import heroesJson from '../data/heroes.json';
 import enemiesJson from '../data/enemies.json';
-import wavesJson from '../data/waves.json';
 import tuningJson from '../data/tuning.json';
 
 export type Tag = 'web' | 'ember' | 'swarm' | 'none';
@@ -25,6 +24,9 @@ export interface HeroDef {
   burnDps?: number;
   sunderSec?: number;
   executeBelow?: number;
+  trapEverySec?: number;
+  trapRadius?: number;
+  trapSec?: number;
 }
 
 export interface EnemyDef {
@@ -37,19 +39,12 @@ export interface EnemyDef {
   nectar: number;
   seedDps: number;
   size: number;
+  boss?: boolean;
 }
 
-export interface WaveGroup {
-  enemy: string;
-  count: number;
-  every: number;
-  side: 'edge' | 'air';
-  delay?: number;
-}
 
 export const HEROES = heroesJson as Record<string, HeroDef>;
 export const ENEMIES = enemiesJson as Record<string, EnemyDef>;
-export const WAVES = (wavesJson as { waves: { groups: WaveGroup[] }[] }).waves;
 export const TUNING = tuningJson;
 export const HERO_IDS = Object.keys(HEROES);
 

@@ -4,6 +4,7 @@ import { EnemyDef, TUNING } from './data';
 /** An enemy that wanders toward the seed, pushing apart from its neighbours. */
 export class Enemy {
   hp: number;
+  maxHp: number;
   alive = true;
   atSeed = false;
   webUntil = 0;
@@ -11,6 +12,7 @@ export class Enemy {
   burnDps = 0;
   sunderUntil = 0;
   heldUntil = 0; // pinned in place by a melee helper
+  speedMult = 1;
   now = 0;
   body: Phaser.GameObjects.Shape;
   shadow?: Phaser.GameObjects.Ellipse;
@@ -29,10 +31,14 @@ export class Enemy {
     private seedX: number,
     private seedY: number,
     private seedR: number,
+    hpScale = 1,
   ) {
-    this.hp = def.hp;
+    this.maxHp = def.hp * hpScale;
+    this.hp = this.maxHp;
     const s = def.size;
-    if (def.flying) {
+    if (def.boss) {
+      this.body = scene.add.circle(x, y, s, 0x3f7a3a).setStrokeStyle(6, 0xd4af37).setDepth(3);
+    } else if (def.flying) {
       this.shadow = scene.add.ellipse(x, y + 14, s * 1.6, s * 0.6, 0x000000, 0.35);
       this.body = scene.add.triangle(x, y, 0, s * 2, s, 0, s * 2, s * 2, 0xf2d04c).setStrokeStyle(2, 0x3a2a00).setDepth(3);
     } else if (def.physicalImmune) {
@@ -61,8 +67,8 @@ export class Enemy {
       // Head for the seed, drifting side to side so they don't march in straight lines.
       const angle = Math.atan2(dy, dx) + Math.sin(now * this.wobbleSpeed + this.wobblePhase) * this.wobbleAmount * Math.min(1, dist / 250);
       const slow = this.webbed ? 1 - TUNING.webSlow : 1;
-      let vx = Math.cos(angle) * this.def.speed * slow;
-      let vy = Math.sin(angle) * this.def.speed * slow;
+      let vx = Math.cos(angle) * this.def.speed * slow * this.speedMult;
+      let vy = Math.sin(angle) * this.def.speed * slow * this.speedMult;
       // Separation: push away from neighbours of the same layer (ground or air).
       for (const o of others) {
         if (o === this || !o.alive || o.def.flying !== this.def.flying) continue;
@@ -92,9 +98,9 @@ export class Enemy {
     else this.body.setAlpha(this.def.physicalImmune ? 0.55 : 1);
     const w = this.def.size * 2.4;
     this.bar.clear();
-    if (this.hp < this.def.hp) {
+    if (this.hp < this.maxHp && !this.def.boss) {
       this.bar.fillStyle(0x000000, 0.6).fillRect(this.x - w / 2, this.y - this.def.size - 12, w, 4);
-      this.bar.fillStyle(this.burning ? 0xff8a2a : 0xe5484d).fillRect(this.x - w / 2, this.y - this.def.size - 12, (w * Math.max(0, this.hp)) / this.def.hp, 4);
+      this.bar.fillStyle(this.burning ? 0xff8a2a : 0xe5484d).fillRect(this.x - w / 2, this.y - this.def.size - 12, (w * Math.max(0, this.hp)) / this.maxHp, 4);
     }
   }
 

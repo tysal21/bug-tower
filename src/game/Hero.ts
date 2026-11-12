@@ -6,6 +6,8 @@ export class Hero {
   homeX: number;
   homeY: number;
   copies = 1;
+  stunnedUntil = 0;
+  trapTimer = 0;
   stars = 1;
   body: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
@@ -13,7 +15,7 @@ export class Hero {
 
   constructor(scene: Phaser.Scene, public id: string, public def: HeroDef, public x: number, public y: number) {
     this.homeX = x; this.homeY = y;
-    const size = def.moves ? 28 : 38; // roamers are smaller, stationary spiders bigger
+    const size = 30;
     this.body = scene.add.rectangle(x, y, size, size, TAG_COLOR[def.tag]).setStrokeStyle(3, rarityColor(def.rarity)).setDepth(2);
     this.label = scene.add
       .text(x, y, def.name.split(/[ -]/)[0].slice(0, 4), { fontFamily: 'monospace', fontSize: '11px', color: '#111' })
@@ -40,6 +42,9 @@ export class Hero {
     this.starText.setPosition(this.x, this.y + 26);
     return false;
   }
+
+  /** Moves the hero home position (used when it is placed or replaced). */
+  setHome(x: number, y: number) { this.homeX = x; this.homeY = y; }
 
   refresh() { this.starText.setText('★'.repeat(this.stars)); }
 

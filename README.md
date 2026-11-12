@@ -14,11 +14,11 @@ Tech: TypeScript + Phaser, built with Vite.
 2. In a terminal inside this folder: `npm install` (first time only), then `npm run dev`.
 3. Open the link it prints (usually http://localhost:5173).
 
-Useful extras: add `?speed=3` to the address to run the game 3x faster, or `?test` to swap helpers by clicking their slots.
+Useful extras: add `?speed=3` to the address to run the game 3x faster, `?test` to swap helpers by clicking them, or `?boss` to skip to 5 seconds before the Frog King.
 
 ## Where things live
 
-- `src/data/*.json` - all the game numbers (heroes, enemies, waves, tuning). Change balance here.
-- `src/scenes/BattleScene.ts` - the battle: waves, heroes attacking, combos, the Stinger.
+- `src/data/*.json` - all the game numbers (heroes, enemies, tuning incl. the spawn ramp and boss). Change balance here.
+- `src/scenes/BattleScene.ts` - the battle: spawn ramp, Frog King, helpers, combos, packs, the Stinger.
 - `src/game/` - small building blocks (Hero, Enemy, data types).
 - `.github/workflows/deploy.yml` - publishes the game to GitHub Pages when `main` changes.
