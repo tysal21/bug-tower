@@ -1,0 +1,27 @@
+{
+  "name": "bug-tower",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "vite build --mode single",
+    "check": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tysal21/bug-tower.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tysal21/bug-tower/issues"
+  },
+  "homepage": "https://github.com/tysal21/bug-tower#readme",
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vite-plugin-singlefile": "^2.3.4"
+  },
+  "private": true,
+  "type": "module"
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heartseed</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #14110f; overflow: hidden; }
+      #game { width: 100%; height: 100%; }
+      #menu { position: fixed; inset: 0; overflow-y: auto; background: rgba(16, 20, 12, 0.97); color: #f0e6d2;
+        font: 15px/1.45 system-ui, -apple-system, sans-serif; z-index: 10; }
+      #menu[hidden] { display: none; }
+      .menu-inner { max-width: 880px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-left)) 40px; display: grid; gap: 14px; }
+      #menu h1 { margin: 0; font: 600 28px/1.1 ui-monospace, monospace; color: #b8e986; }
+      #menu h2 { margin: 6px 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #cfc4ad; }
+      #menu .summary { margin: 4px 0 0; }
+      #menu .muted { color: #a59a84; } #menu .small { font-size: 13px; }
+      #menu nav { display: flex; gap: 6px; }
+      #menu button { font: inherit; color: #1b1405; background: #f2c94c; border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer; }
+      #menu button:disabled { background: #4a4434; color: #8a7f6a; cursor: default; }
+      #menu button.secondary { background: #3a4a2c; color: #e6efd8; }
+      #menu button.link { background: none; color: #a59a84; text-decoration: underline; padding: 0; justify-self: start; }
+      #menu nav button { background: #2a3420; color: #cfc4ad; }
+      #menu nav button.on { background: #b8e986; color: #14200c; }
+      #menu section { display: grid; gap: 12px; }
+      .gold { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; }
+      .pip { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #f2c94c; display: inline-block; }
+      .pip.full { background: #f2c94c; }
+      .offers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+      .offer { background: #2a2418; border: 2px solid #6a5a3a; border-radius: 8px; padding: 12px; display: grid; gap: 6px; }
+      .offer.box { border-color: #3b82f6; } .offer.grove { border-color: #a855f7; }
+      .offer.sold { place-items: center; color: #6a5a3a; min-height: 96px; }
+      .offer-name { font-weight: 600; } .offer-sub { font-size: 13px; color: #a59a84; }
+      .team { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+      .chip { border: 2px solid var(--tag, #444); border-radius: 6px; padding: 6px; font-size: 12px; display: grid; gap: 2px; min-height: 44px; }
+      .chip.empty { border-style: dashed; border-color: #3a3a2a; color: #5a5a4a; place-items: center; }
+      .chip .stars { color: #f5d76e; }
+      button.start { font-size: 18px !important; padding: 14px !important; background: #b8e986 !important; }
+      .branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+      .branch { display: grid; gap: 8px; align-content: start; }
+      .node { background: #22281a; border: 2px solid #3a4a2c; border-radius: 8px; padding: 10px; display: grid; gap: 6px; }
+      .node.owned { border-color: #b8e986; } .node.locked { opacity: .55; }
+      .node-top { display: flex; justify-content: space-between; } .rank { color: #f5d76e; }
+      .tier { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #a59a84; }
+      .tier.early { color: #b8e986; } .tier.late { color: #c084fc; }
+      .node button { justify-self: start; padding: 6px 12px; } .maxed { color: #b8e986; font-weight: 600; }
+      .reveal { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: grid; place-items: center; align-content: center; gap: 16px; padding: 16px; }
+      .card { width: 190px; height: 260px; perspective: 800px; position: relative; cursor: pointer; }
+      .card .back, .card .face { position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden; transition: transform .35s; display: grid; place-items: center; }
+      .card .back { background: #2b2433; border: 4px solid #f2c94c; font: 700 48px monospace; color: #f2c94c; }
+      .card .face { transform: rotateY(180deg); background: var(--tag); color: #111; border: 6px solid #666; align-content: center; gap: 6px; text-align: center; padding: 10px; }
+      .card.flipped .back { transform: rotateY(180deg); } .card.flipped .face { transform: rotateY(360deg); }
+      .card.rare .back { box-shadow: 0 0 28px 6px #3b82f6; } .card.rare .face { border-color: #3b82f6; }
+      .card.epic .back { box-shadow: 0 0 34px 10px #a855f7; } .card.epic .face { border-color: #a855f7; }
+      .card.legendary .back { box-shadow: 0 0 44px 14px #f5b301; animation: shake .3s 2; } .card.legendary .face { border-color: #f5b301; }
+      @keyframes shake { 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
+      .swap { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 600px; }
+      @media (max-width: 560px) { .offers { grid-template-columns: 1fr; } .team { grid-template-columns: repeat(3, 1fr); } }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

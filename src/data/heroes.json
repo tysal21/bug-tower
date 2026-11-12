@@ -1,0 +1,10 @@
+{
+  "ant": {"name": "Ant Legionnaire", "rarity": "common", "tag": "swarm", "damageType": "physical", "damage": 8, "attacksPerSec": 1.2, "range": 40, "hitsAir": false, "moves": true, "moveSpeed": 130},
+  "orbweaver": {"name": "Orb-Weaver", "rarity": "common", "tag": "web", "damageType": "physical", "damage": 4, "attacksPerSec": 0.8, "range": 220, "hitsAir": true, "webSec": 3, "moves": true, "moveSpeed": 80},
+  "firefly": {"name": "Firefly Lanternbearer", "rarity": "common", "tag": "ember", "damageType": "fire", "damage": 6, "attacksPerSec": 0.9, "range": 160, "hitsAir": true, "burnSec": 4, "burnDps": 4, "moves": true, "moveSpeed": 140},
+  "bee": {"name": "Honeybee Lancer", "rarity": "rare", "tag": "swarm", "damageType": "physical", "damage": 6, "attacksPerSec": 1.6, "range": 120, "hitsAir": true, "moves": true, "moveSpeed": 170},
+  "bombardier": {"name": "Bombardier Beetle", "rarity": "rare", "tag": "ember", "damageType": "fire", "damage": 10, "attacksPerSec": 0.6, "range": 70, "hitsAir": false, "splash": 70, "burnSec": 4, "burnDps": 5, "moves": true, "moveSpeed": 95},
+  "trapdoor": {"name": "Trapdoor Spider", "rarity": "rare", "tag": "web", "damageType": "physical", "damage": 3, "attacksPerSec": 0.5, "range": 110, "hitsAir": false, "splash": 80, "webSec": 4, "moves": true, "moveSpeed": 70, "trapEverySec": 6, "trapRadius": 60, "trapSec": 8},
+  "stag": {"name": "Stag Beetle Titan", "rarity": "epic", "tag": "none", "damageType": "physical", "damage": 30, "attacksPerSec": 0.35, "range": 45, "hitsAir": false, "sunderSec": 5, "moves": true, "moveSpeed": 75},
+  "mantis": {"name": "Mantis Saint", "rarity": "legendary", "tag": "none", "damageType": "physical", "damage": 18, "attacksPerSec": 0.8, "range": 45, "hitsAir": false, "executeBelow": 0.15, "moves": true, "moveSpeed": 150}
+}

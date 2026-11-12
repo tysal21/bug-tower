@@ -1,0 +1,14 @@
+{
+  "note": "Shop items between runs. packType picks the odds below. requires = skill tree node that unlocks it. weight = how often it shows up in a shop slot.",
+  "offerSlots": 3,
+  "rerollCost": 1,
+  "items": {
+    "meadow": { "name": "Meadow Pack",   "cost": 1, "packs": 1, "packType": "meadow", "weight": 10 },
+    "box":    { "name": "Meadow Box",    "cost": 3, "packs": 4, "packType": "meadow", "weight": 4, "requires": "boxes" },
+    "grove":  { "name": "Grove Pack",    "cost": 2, "packs": 1, "packType": "grove",  "weight": 5, "requires": "grovePacks" }
+  },
+  "packTypes": {
+    "meadow": { "odds": { "common": 70, "rare": 24, "epic": 5,  "legendary": 1 } },
+    "grove":  { "odds": { "common": 35, "rare": 45, "epic": 16, "legendary": 4 } }
+  }
+}
