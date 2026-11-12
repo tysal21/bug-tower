@@ -1,5 +1,5 @@
 {
-  "seedHp": 1500,
+  "seedHp": 180,
   "stinger": {
     "damage": 5,
     "attacksPerSec": 4,
@@ -16,17 +16,6 @@
     "burnDps": 5
   },
   "sunderArmorCut": 0.5,
-  "packs": {
-    "firstPrice": 8,
-    "priceGrowth": 1.2,
-    "cardsPerPack": 1,
-    "rarityOdds": {
-      "common": 70,
-      "rare": 24,
-      "epic": 5,
-      "legendary": 1
-    }
-  },
   "starMultiplier": 1.6,
   "copiesForStar": [
     1,
@@ -39,8 +28,8 @@
   "run": {
     "note": "Enemies spawn non-stop and ramp up until bossAtSec, then the Frog King arrives. Surges are short bursts that feel like waves.",
     "bossAtSec": 300,
-    "spawnPerSecStart": 0.35,
-    "spawnPerSecEnd": 1.1,
+    "spawnPerSecStart": 1.2,
+    "spawnPerSecEnd": 2.5,
     "hpGrowthPerMin": 0.1,
     "surgeEverySec": 60,
     "surgeSize": 8,

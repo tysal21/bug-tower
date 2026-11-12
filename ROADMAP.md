@@ -3,9 +3,9 @@
 - [x] Phase 0: Discovery (research, questions, tech stack)
 - [x] Phase 1: Design doc (reviewed by Tyler 2026-11-11; quest nodes and Stinger added)
 - [ ] Phase 2: Greybox prototype
-  - [ ] Step 1: top-down battle, roaming helpers, combos, Stinger, free first pack, Nectar shop, stars, spawn ramp, Frog King
-  - [ ] Step 2: spells, mini-bosses, enemies that hurt helpers (if wanted)
-  - [ ] Step 3: Mastery tree + quests + local save
+  - [ ] Step 1: top-down battle, roaming helpers, combos, AoE Stinger, spawn ramp, Frog King
+  - [ ] Step 2: between-runs menu: gold shop with rerolls, boxes, Grove packs, Mastery skill tree, local save
+  - [ ] Step 3: spells, quest nodes, Legends (per-hero) nodes, mini-bosses
 - [ ] Phase 3: Pack-ripping feel (tear-to-open, face-down cards, rarity glow, foil/holo effects)
 - [ ] Phase 4: Content and balance (cards in JSON, balance spreadsheet)
 - [ ] Phase 5: Art and audio (PixelLab art, style guide, sound, music)

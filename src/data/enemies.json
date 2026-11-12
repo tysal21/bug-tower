@@ -1,7 +1,7 @@
 {
-  "grub": {"name": "Blightgrub", "hp": 30, "speed": 60, "armor": 0, "flying": false, "physicalImmune": false, "nectar": 2, "seedDps": 5, "size": 12},
-  "snail": {"name": "Ironshell Snail", "hp": 120, "speed": 28, "armor": 0.6, "flying": false, "physicalImmune": false, "nectar": 5, "seedDps": 12, "size": 18},
-  "wasp": {"name": "Wasp Raider", "hp": 40, "speed": 80, "armor": 0, "flying": true, "physicalImmune": false, "nectar": 3, "seedDps": 6, "size": 12},
-  "wisp": {"name": "Blight Wisp", "hp": 50, "speed": 42, "armor": 0, "flying": false, "physicalImmune": true, "nectar": 5, "seedDps": 8, "size": 14},
-  "frogking": {"name": "Frog King", "hp": 1400, "speed": 22, "armor": 0.2, "flying": false, "physicalImmune": false, "nectar": 0, "seedDps": 15, "size": 40, "boss": true}
+  "grub": {"name": "Blightgrub", "hp": 30, "speed": 60, "armor": 0, "flying": false, "physicalImmune": false, "seedDps": 5, "size": 12},
+  "snail": {"name": "Ironshell Snail", "hp": 120, "speed": 28, "armor": 0.6, "flying": false, "physicalImmune": false, "seedDps": 12, "size": 18},
+  "wasp": {"name": "Wasp Raider", "hp": 40, "speed": 80, "armor": 0, "flying": true, "physicalImmune": false, "seedDps": 6, "size": 12},
+  "wisp": {"name": "Blight Wisp", "hp": 50, "speed": 42, "armor": 0, "flying": false, "physicalImmune": true, "seedDps": 8, "size": 14},
+  "frogking": {"name": "Frog King", "hp": 1400, "speed": 22, "armor": 0.2, "flying": false, "physicalImmune": false, "seedDps": 15, "size": 40, "boss": true}
 }

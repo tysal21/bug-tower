@@ -1,0 +1,15 @@
+{
+  "note": "Mastery tree. cost[i] = Mastery for rank i+1. effect = what each rank adds. requires = another node (at rank 1+) that must be bought first.",
+  "branches": ["Economy", "Hive"],
+  "nodes": {
+    "gold":        { "branch": "Economy", "name": "Deeper Pockets",  "desc": "+1 gold to spend in the shop each run",       "cost": [15, 45, 110],     "effect": { "maxGold": 1 } },
+    "reroll":      { "branch": "Economy", "name": "Lucky Shopper",   "desc": "+1 free shop reroll each run",                "cost": [20, 60],          "effect": { "freeRerolls": 1 } },
+    "boxes":       { "branch": "Economy", "name": "Booster Boxes",   "desc": "Boxes (4 packs for 3 gold) appear in the shop", "cost": [40],           "effect": {}, "requires": "gold" },
+    "grovePacks":  { "branch": "Economy", "name": "Grove Packs",     "desc": "Better-odds Grove Packs join the shop",        "cost": [80],              "effect": {}, "requires": "boxes" },
+    "husk":        { "branch": "Hive",    "name": "Thick Husk",      "desc": "+15% Heartseed health",                       "cost": [10, 20, 35, 55, 80], "effect": { "seedHpMult": 0.15 } },
+    "stinger":     { "branch": "Hive",    "name": "Sharper Stinger", "desc": "+25% Stinger damage",                         "cost": [10, 20, 35, 55, 80], "effect": { "stingerDmgMult": 0.25 } },
+    "quickSting":  { "branch": "Hive",    "name": "Quick Sting",     "desc": "+15% Stinger speed",                          "cost": [25, 50, 90],      "effect": { "stingerSpeedMult": 0.15 }, "requires": "stinger" },
+    "wideSting":   { "branch": "Hive",    "name": "Wide Sting",      "desc": "+15% Stinger circle size",                    "cost": [20, 45, 85],      "effect": { "stingerRadiusMult": 0.15 }, "requires": "stinger" },
+    "harvest":     { "branch": "Hive",    "name": "Harvest",         "desc": "+20% Mastery from runs",                      "cost": [30, 70, 130],     "effect": { "masteryMult": 0.2 } }
+  }
+}

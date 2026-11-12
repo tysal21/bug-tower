@@ -36,7 +36,6 @@ export interface EnemyDef {
   armor: number;
   flying: boolean;
   physicalImmune: boolean;
-  nectar: number;
   seedDps: number;
   size: number;
   boss?: boolean;

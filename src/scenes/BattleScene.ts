@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { ENEMIES, HEROES, HERO_IDS, TUNING, DamageType, TAG_COLOR } from '../game/data';
 import { Enemy } from '../game/Enemy';
-import { Hero, rarityColor } from '../game/Hero';
-import { packPrice, rollHero, starsFor } from '../game/packs';
+import { Hero } from '../game/Hero';
+import { MetaStats } from '../meta/meta';
 
 export const W = 1280;
 export const H = 720;
@@ -13,7 +13,10 @@ function homeFor(i: number) {
   const r = 85 + (i % 2) * 35;
   return { x: SEED.x + Math.cos(a) * r, y: SEED.y + Math.sin(a) * r };
 }
-const RARITY_HEX: Record<string, string> = { common: '#bbbbbb', rare: '#5b9cff', epic: '#c084fc', legendary: '#ffc83d' };
+
+export interface TeamMember { id: string; copies: number; stars: number }
+export interface RunResult { won: boolean; seconds: number; kills: number }
+export interface RunSetup { team: TeamMember[]; meta: MetaStats; onEnd?: (r: RunResult) => void }
 
 interface Trap { x: number; y: number; r: number; until: number; gfx: Phaser.GameObjects.Arc }
 
@@ -21,8 +24,6 @@ export class BattleScene extends Phaser.Scene {
   enemies: Enemy[] = [];
   heroes: (Hero | null)[] = [];
   seedHp = TUNING.seedHp;
-  nectar = 0;
-  packsBought = 0;
   spawnDebt = 0; // fractional enemies owed by the spawn ramp
   nextSurge = 0;
   boss: Enemy | null = null;
@@ -31,12 +32,15 @@ export class BattleScene extends Phaser.Scene {
   bossFlop = 0;
   traps: Trap[] = [];
   state: 'playing' | 'won' | 'lost' = 'playing';
-  paused = false; // true while a pack is being opened
-  pendingHero: string | null = null; // pulled hero waiting for a slot (board full)
+  paused = false;
   time_ = 0;
   speed = 1;
   testMode = false;
-  stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0, packs: 0 };
+  stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0 };
+  team: TeamMember[] = [];
+  meta!: MetaStats;
+  maxSeedHp = TUNING.seedHp;
+  onEnd: (r: RunResult) => void = () => {};
   bossBar!: Phaser.GameObjects.Graphics;
   bossLabel!: Phaser.GameObjects.Text;
 
@@ -48,26 +52,28 @@ export class BattleScene extends Phaser.Scene {
   hud!: Phaser.GameObjects.Text;
   seedBar!: Phaser.GameObjects.Graphics;
   banner!: Phaser.GameObjects.Text;
-  shopBtn!: Phaser.GameObjects.Rectangle;
-  shopText!: Phaser.GameObjects.Text;
-  overlay?: Phaser.GameObjects.Container;
-  replaceUi?: Phaser.GameObjects.Container;
 
   constructor() { super('battle'); }
+
+  init(data: RunSetup) {
+    this.team = data.team ?? [];
+    this.meta = data.meta;
+    this.onEnd = data.onEnd ?? (() => {});
+  }
 
   create() {
     const q = new URLSearchParams(location.search);
     this.enemies = []; this.heroes = Array.from({ length: TUNING.maxHelpers }, () => null);
-    this.seedHp = TUNING.seedHp; this.nectar = 0; this.packsBought = 0;
+    this.maxSeedHp = TUNING.seedHp * this.meta.seedHpMult;
+    this.seedHp = this.maxSeedHp;
     this.spawnDebt = 0; this.nextSurge = TUNING.run.surgeEverySec; this.boss = null; this.bossSpawned = false;
     this.bossTongue = 0; this.bossFlop = 0; this.traps = [];
-    this.state = 'playing'; this.paused = false; this.pendingHero = null; this.time_ = 0;
-    this.stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0, packs: 0 };
+    this.state = 'playing'; this.paused = false; this.time_ = 0;
+    this.stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0 };
     this.speed = Number(q.get('speed')) || 1;
     this.testMode = q.has('test');
     // ?boss skips ahead to 5 seconds before the Frog King, for testing.
     if (q.has('boss')) { this.time_ = TUNING.run.bossAtSec - 5; this.nextSurge = Infinity; }
-    this.overlay = undefined; this.replaceUi = undefined;
 
     // Ground: a top-down meadow with a worn circle around the seed.
     this.add.rectangle(W / 2, H / 2, W, H, 0x23301c);
@@ -84,132 +90,26 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5).setDepth(15);
     this.reticle = this.add.circle(0, 0, TUNING.stinger.hitRadius).setStrokeStyle(2, 0xff4d6d, 0.8).setVisible(false).setDepth(8);
 
-    // Shop button (bottom right)
-    this.shopBtn = this.add.rectangle(W - 130, H - 50, 220, 64, 0x6b4f1d).setStrokeStyle(3, 0xf2c94c).setDepth(9)
-      .setInteractive({ useHandCursor: true });
-    this.shopText = this.add.text(W - 130, H - 50, '', { fontFamily: 'monospace', fontSize: '18px', color: '#fff3cf', align: 'center' })
-      .setOrigin(0.5).setDepth(9);
-    this.shopBtn.on('pointerdown', () => this.buyPack());
-
     this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
-      if (this.state !== 'playing') { this.scene.restart(); return; }
       // Presses that start on a button or overlay never sting.
       this.uiPress = over.some(o => o.active && o.scene) || this.paused;
       if (this.uiPress) return;
       const slot = this.heroes.findIndex(h => h && Math.hypot(p.worldX - h.x, p.worldY - h.y) < 24);
-      if (slot >= 0 && this.pendingHero) { this.placeInSlot(slot, this.pendingHero); this.closeReplace(); return; }
       if (slot >= 0 && this.testMode) { this.cycleSlot(slot); return; }
     });
     this.input.on('pointerup', () => { this.uiPress = false; });
     this.input.on('pointerupoutside', () => { this.uiPress = false; });
 
     (window as unknown as { __battle: BattleScene }).__battle = this;
-    this.drawHud();
-    // Every run starts with one free pack.
-    this.openPack(true);
-  }
-
-  // ---------- packs ----------
-  buyPack() {
-    if (this.paused || this.state !== 'playing' || this.pendingHero) return;
-    const price = packPrice(this.packsBought);
-    if (this.nectar < price) { this.floatText(this.shopBtn.x, this.shopBtn.y - 50, 'Not enough Nectar', '#ffb4b4'); return; }
-    this.nectar -= price;
-    this.packsBought++;
-    this.openPack(false);
-  }
-
-  /** Greybox pack opening: tap the pack, see the rarity glow, tap to flip. Game pauses meanwhile. */
-  openPack(free: boolean) {
-    this.paused = true;
-    this.stingerDown = false;
-    this.stats.packs++;
-    const heroId = rollHero();
-    const def = HEROES[heroId];
-    const c = this.add.container(0, 0).setDepth(20);
-    this.overlay = c;
-    const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setInteractive();
-    const title = this.add.text(W / 2, 90, free ? 'Your first pack is free' : 'Meadow Pack', { fontFamily: 'monospace', fontSize: '28px', color: '#fff3cf' }).setOrigin(0.5);
-    const hint = this.add.text(W / 2, H - 70, 'Tap the pack to open it', { fontFamily: 'monospace', fontSize: '20px', color: '#cfc4ad' }).setOrigin(0.5);
-    const glow = this.add.rectangle(W / 2, H / 2, 250, 340, rarityColor(def.rarity), 0).setStrokeStyle(0);
-    const card = this.add.rectangle(W / 2, H / 2, 220, 310, 0x7a2e2e).setStrokeStyle(4, 0xf2c94c);
-    const cardText = this.add.text(W / 2, H / 2, 'MEADOW\nPACK', { fontFamily: 'monospace', fontSize: '26px', color: '#fff3cf', align: 'center' }).setOrigin(0.5);
-    c.add([dim, title, hint, glow, card, cardText]);
-
-    let step = 0;
-    dim.on('pointerdown', () => {
-      if (step === 0) {
-        // Torn open: show a face-down card, glowing in its rarity colour.
-        step = 1;
-        card.setFillStyle(0x2b2433);
-        cardText.setText('?');
-        hint.setText('Tap to flip');
-        if (def.rarity !== 'common') {
-          glow.setFillStyle(rarityColor(def.rarity), 0.5);
-          this.tweens.add({ targets: glow, scale: 1.08, alpha: 0.6, yoyo: true, repeat: -1, duration: 400 });
-        }
-        if (def.rarity === 'legendary') this.cameras.main.shake(300, 0.01);
-      } else if (step === 1) {
-        step = 1.5; // flipping: ignore taps until the card is face up
-        this.tweens.add({
-          targets: [card, cardText], scaleX: 0, duration: 120, yoyo: true,
-          onComplete: () => { step = 2; },
-          onYoyo: () => {
-            if (!cardText.active) return;
-            card.setFillStyle(TAG_COLOR[def.tag]).setStrokeStyle(6, rarityColor(def.rarity));
-            const owned = this.heroes.find(h => h?.id === heroId);
-            const note = owned ? `Duplicate! ${'★'.repeat(starsFor(owned.copies + 1))}` : 'New helper';
-            cardText.setText(`${def.name}\n\n${def.rarity.toUpperCase()}\n${def.tag === 'none' ? '' : def.tag.toUpperCase()}\n\n${note}`)
-              .setFontSize(17).setColor('#111').setWordWrapWidth(200);
-          },
-        });
-        hint.setText('Tap to continue');
-      } else if (step === 2) {
-        // Hide now, destroy a moment later: destroying an object inside its own click
-        // handler leaves Phaser's pointer state stuck and the next press is ignored.
-        c.setVisible(false);
-        dim.disableInteractive();
-        this.time.delayedCall(30, () => c.destroy());
-        this.overlay = undefined;
-        this.paused = false;
-        this.receiveHero(heroId);
-      }
+    // Bring in the team bought in the shop.
+    this.team.forEach((m, i) => {
+      if (i >= TUNING.maxHelpers) return;
+      this.placeInSlot(i, m.id);
+      const h = this.heroes[i]!;
+      h.copies = m.copies; h.stars = m.stars; h.refresh();
     });
-  }
-
-  receiveHero(id: string) {
-    const owned = this.heroes.find(h => h?.id === id);
-    if (owned) {
-      owned.copies++;
-      const before = owned.stars;
-      owned.stars = starsFor(owned.copies);
-      owned.refresh();
-      this.floatText(owned.x, owned.y - 34, owned.stars > before ? `${'★'.repeat(owned.stars)} STAR UP!` : `+1 copy`, '#f5d76e');
-      return;
-    }
-    const free = this.heroes.findIndex(h => !h);
-    if (free >= 0) { this.placeInSlot(free, id); return; }
-    // Board full: choose a hero to replace, or discard.
-    this.pendingHero = id;
-    this.paused = true;
-    const c = this.add.container(0, 0).setDepth(19);
-    const t = this.add.text(W / 2, 40, `Team full: tap a helper to replace it with ${HEROES[id].name}`, {
-      fontFamily: 'monospace', fontSize: '18px', color: '#fff3cf', backgroundColor: '#000000aa', padding: { x: 10, y: 6 },
-    }).setOrigin(0.5, 0);
-    const btn = this.add.rectangle(W / 2, H - 50, 180, 50, 0x5a2222).setStrokeStyle(2, 0xffb4b4).setInteractive({ useHandCursor: true });
-    const bt = this.add.text(W / 2, H - 50, 'Discard', { fontFamily: 'monospace', fontSize: '18px', color: '#ffe0e0' }).setOrigin(0.5);
-    btn.on('pointerdown', () => this.closeReplace());
-    c.add([t, btn, bt]);
-    this.replaceUi = c;
-  }
-
-  closeReplace() {
-    this.pendingHero = null;
-    this.paused = false;
-    const ui = this.replaceUi;
-    ui?.setVisible(false);
-    this.time.delayedCall(30, () => ui?.destroy());
-    this.replaceUi = undefined;
+    this.drawHud();
+    this.showBanner(this.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!');
   }
 
   placeInSlot(slot: number, id: string) {
@@ -366,9 +266,7 @@ export class BattleScene extends Phaser.Scene {
 
   kill(e: Enemy) {
     if (!e.alive) return;
-    this.nectar += e.def.nectar;
     this.stats.kills++;
-    this.floatText(e.x, e.y, `+${e.def.nectar}`, '#f2c94c');
     e.destroy();
   }
 
@@ -377,22 +275,19 @@ export class BattleScene extends Phaser.Scene {
     const p = this.input.activePointer;
     // Read the button state every frame rather than relying on press events,
     // which can be missed right after an overlay closes.
-    this.stingerDown = p.isDown && !this.uiPress && !this.pendingHero;
-    this.reticle.setPosition(p.worldX, p.worldY).setVisible(this.stingerDown);
+    this.stingerDown = p.isDown && !this.uiPress;
+    this.reticle.setPosition(p.worldX, p.worldY).setRadius(TUNING.stinger.hitRadius * this.meta.stingerRadiusMult).setVisible(this.stingerDown);
     this.stingerCooldown -= dt;
     if (!this.stingerDown || this.stingerCooldown > 0) return;
     const st = TUNING.stinger;
-    let best: Enemy | null = null;
-    let bestD = st.hitRadius;
-    for (const e of this.enemies) {
-      const d = Math.hypot(e.x - p.worldX, e.y - p.worldY);
-      if (e.alive && d <= bestD) { bestD = d; best = e; }
-    }
-    if (!best) return;
-    this.stingerCooldown = 1 / st.attacksPerSec;
+    const radius = st.hitRadius * this.meta.stingerRadiusMult;
+    // The Stinger hits every enemy touching the circle.
+    const hits = this.enemies.filter(e => e.alive && Math.hypot(e.x - p.worldX, e.y - p.worldY) <= radius + e.def.size);
+    if (!hits.length) return;
+    this.stingerCooldown = 1 / (st.attacksPerSec * this.meta.stingerSpeedMult);
     this.stats.stingerHits++;
-    this.damage(best, st.damage * (best.webbed ? 1 + st.webbedBonus : 1), 'physical');
-    this.ring(best.x, best.y, 16, 0xff4d6d);
+    for (const e of hits) this.damage(e, st.damage * this.meta.stingerDmgMult * (e.webbed ? 1 + st.webbedBonus : 1), 'physical');
+    this.ring(p.worldX, p.worldY, radius, 0xff4d6d);
   }
 
   // ---------- spawning: a steady ramp, surges, then the boss ----------
@@ -481,13 +376,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   end(result: 'won' | 'lost') {
+    if (this.state !== 'playing') return;
     this.state = result;
     this.stingerDown = false;
-    const s = this.stats;
-    this.banner.setText(
-      (result === 'won' ? 'The Heartseed survives!' : 'The Heartseed has fallen') +
-      `\nYour helpers are gone. Next run starts fresh.\n\nSurvived ${this.clock(this.time_)} · ${s.kills} kills · ${s.packs} packs opened\n${s.wildfires} Wildfires · ${s.executes} executes · ${s.stingerHits} stings\n\nTap to play again`,
-    ).setFontSize(24).setAlpha(1);
+    this.banner.setText(result === 'won' ? 'The Heartseed survives!' : 'The Heartseed has fallen').setFontSize(36).setAlpha(1);
+    // Short pause so you see what happened, then the menu takes over.
+    this.time.delayedCall(1400, () => this.onEnd({ won: result === 'won', seconds: Math.round(this.time_), kills: this.stats.kills }));
   }
 
   // ---------- main loop ----------
@@ -519,7 +413,7 @@ export class BattleScene extends Phaser.Scene {
   drawHud() {
     const left = TUNING.run.bossAtSec - this.time_;
     const timer = this.bossSpawned ? 'BOSS FIGHT' : `Boss in ${this.clock(left)}`;
-    this.hud.setText(`${this.clock(this.time_)}   ${timer}   Nectar ${this.nectar}   Helpers ${this.heroes.filter(Boolean).length}/${TUNING.maxHelpers}`);
+    this.hud.setText(`${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}`);
     this.bossBar.clear();
     this.bossLabel.setText('');
     if (this.boss?.alive) {
@@ -528,15 +422,10 @@ export class BattleScene extends Phaser.Scene {
       this.bossBar.fillStyle(0x000000, 0.6).fillRect(bx, by, bw, 12);
       this.bossBar.fillStyle(0xd4af37).fillRect(bx, by, (bw * Math.max(0, b.hp)) / b.maxHp, 12);
     }
-    const price = packPrice(this.packsBought);
-    const afford = this.nectar >= price;
-    this.shopText.setText(`Buy pack\n${price} Nectar`);
-    this.shopBtn.setFillStyle(afford ? 0x8a6420 : 0x3a3020).setStrokeStyle(3, afford ? 0xf2c94c : 0x6a5a3a);
-    this.shopText.setColor(afford ? '#fff3cf' : '#8a7f6a');
     const bw = 300, x = W - bw - 16, y = 16; // seed health, top right
     this.seedBar.clear();
     this.seedBar.fillStyle(0x000000, 0.6).fillRect(x, y, bw, 14);
-    this.seedBar.fillStyle(0x9be36d).fillRect(x, y, (bw * this.seedHp) / TUNING.seedHp, 14);
+    this.seedBar.fillStyle(0x9be36d).fillRect(x, y, (bw * this.seedHp) / this.maxSeedHp, 14);
     this.seedBar.lineStyle(1, 0xf0e6d2, 0.5).strokeRect(x, y, bw, 14);
   }
 
