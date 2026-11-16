@@ -2,6 +2,17 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-16 (Phase 2 step 3: spells, quests, Nectar packs, mini-boss)
+- **Packs open during the run again (Tyler's original ask, confirmed 2026-11-16).** Kills drop Nectar (1 each). The "Open a pack" button (or Space) spends it on a Meadow Pack mid-fight; the game pauses while you flip the card. Price starts at 5 and grows x1.5 per pack that run (5, 8, 11, 17, 25...). The gold Market between runs stays: gold builds your starting team, Nectar grows it mid-run. `nectar.enabled` in tuning.json turns it off.
+- **Spells:** Silk Storm (web everything 5 s), Rain of Embers (burn everything, ignites up to 3 webs into Wildfire), Rally Pheromone (Swarm helpers and the Stinger +50% speed for 8 s; Stinger added so the card is never dead). About 1 card in 6 is a spell. 2 spell slots, keys 1 and 2 or click. Duplicates add stars (longer effect, faster recharge). Spells last one run, like helpers.
+- **Quest cells (5)** sit in the honeycomb with a gold dashed border and fill up as you play; they cost no Mastery and the reward switches on by itself. Pack Rat (open 40 packs: +1 gold), Ant Colony (pull 8 Ants: Ants arrive at 2 stars), Firestarter (75 Wildfires: +30% Wildfire reach), Web Hunter (Sting 200 Webbed enemies: Stinger +25% more vs Webbed), Kingslayer (beat the Frog King: +1 helper slot). Counters live in the save (`counters`). Goals were raised after a bot finished three of them in 14 runs.
+- **Toad Brute mini-boss** at 1:40 and 3:20: swallows a nearby Blightgrub to heal 15%. Worth +5 Mastery and 15 Nectar.
+- **Pity:** after 20 packs in a row with nothing Epic or better, the next card is Epic+. (The doc said 8 packs of 3 cards; packs hold 1 card now, so 8 made Epics far too common in testing.)
+- **New tree nodes:** Sweet Tooth (Economy, +25% Nectar), Quick Chant (Hive, spells recharge faster).
+- **One shared card reveal** (`src/ui/reveal.ts`) is used by the Market and by mid-run packs, so Phase 3's pack-ripping polish only has to be built once.
+- **Bot playtest (14 runs, buys the cheapest glowing cell):** run 1 = 20 s, runs 6 to 10 = 40 to 60 s, run 14 = 68 s. 2 to 5 mid-run packs per run once runs pass 30 s. Nobody has reached a Toad Brute yet without help, so the mini-boss and Frog King are only tested with the `?at=` / `?boss` shortcuts.
+- **Not built (still on the cut list):** tear-to-open packs (Phase 3), enemies hurting helpers, helper health.
+
 ## 2026-11-12 (Between-runs screen redesign, from Tyler's layout reference)
 - Two-panel screen: Market on the left (gold + Mastery top-right, priced pack slots, reroll, brood combs, team), skill tree on the right with Upgrades / Collection tabs and a big Battle button bottom-right.
 - Skill tree is a honeycomb graph growing out of the Heartseed: six branches (Economy, Brood, Fortune, Helpers, Legends, Hive). Each cell shows level x/y, a lock until its parent has a level, and glows when affordable.

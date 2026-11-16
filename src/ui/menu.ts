@@ -1,27 +1,21 @@
 // The between-runs menu: Market (shop + brood combs) on the left, skill tree / collection on the right.
 // Plain HTML over the game canvas.
-import { HEROES, HERO_IDS, TUNING, TAG_COLOR } from '../game/data';
+import { HEROES, HERO_IDS, SPELLS, SPELL_IDS, TUNING, TAG_COLOR } from '../game/data';
 import {
   SHOP, TREE, MetaStats, Pull, Rarity, metaStats, nodeUnlocked, refundAll, rollOffers, openPack, packOdds,
-  syncCombs, combProgress, hatchComb, hatchMs, VARIANT_RANK, variantDamage,
+  syncCombs, combProgress, hatchComb, hatchMs, VARIANT_RANK, variantDamage, questDone, questProgress, bump,
 } from '../meta/meta';
+import type { Loadout } from '../meta/run';
+import { Reveal, VARIANT_LABEL } from './reveal';
 import { SaveData, Variant, writeSave, resetSave, freshSave } from '../meta/save';
-import type { TeamMember } from '../scenes/BattleScene';
 import { treeLayout, hexPoints } from './treeGraph';
 
-export interface RunSummary { seconds: number; kills: number; mastery: number; won: boolean }
+export interface RunSummary { seconds: number; kills: number; mastery: number; won: boolean; quests: string[] }
 
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const pct = (n: number) => (n >= 10 ? n.toFixed(0) : n.toFixed(1)) + '%';
 const TIER_LABEL = { early: 'Buy early', core: 'Core', late: 'Late game' };
-const VARIANT_LABEL: Record<Variant, string> = { standard: 'Standard', foil: 'Foil', holo: 'Holo' };
-
-export function starsFor(copies: number) {
-  let stars = 0;
-  TUNING.copiesForStar.forEach((need, i) => { if (copies >= need) stars = i + 1; });
-  return stars;
-}
 
 export class Menu {
   root: HTMLDivElement;
@@ -29,13 +23,13 @@ export class Menu {
   gold = 1;
   rerolls = 0;
   offers: (string | null)[] = [];
-  team: TeamMember[] = [];
-  queue: Pull[] = []; // cards waiting to be revealed
+  loadout: Loadout = { team: [], spells: [] }; // helpers and spells for the next run
+  questNews: string[] = []; // quests finished since the menu opened
   summary: RunSummary | null = null;
   selected: string | null = null; // skill tree node shown in the detail card
   timer = 0;
 
-  constructor(private save: SaveData, private onStart: (team: TeamMember[]) => void) {
+  constructor(private save: SaveData, private reveal: Reveal, private onStart: (loadout: Loadout) => void) {
     this.root = document.createElement('div');
     this.root.id = 'menu';
     this.root.hidden = true;
@@ -51,7 +45,8 @@ export class Menu {
     this.gold = m.maxGold;
     this.rerolls = m.freeRerolls;
     this.offers = rollOffers(this.save);
-    this.team = [];
+    this.loadout = { team: [], spells: [] };
+    this.questNews = [...(summary?.quests ?? [])];
     this.root.hidden = false;
     syncCombs(this.save, m); writeSave(this.save);
     this.render();
@@ -69,8 +64,7 @@ export class Menu {
     if (this.gold < item.cost) return;
     this.gold -= item.cost;
     this.offers[slot] = null;
-    for (let i = 0; i < item.packs; i++) this.queue.push(...openPack(item.packType, this.m));
-    this.render();
+    this.openPacks(Array.from({ length: item.packs }, () => item.packType));
   }
 
   reroll() {
@@ -85,19 +79,20 @@ export class Menu {
     const m = this.m;
     const packs = hatchComb(this.save, i, m);
     if (!packs.length) return;
-    writeSave(this.save);
-    for (const p of packs) this.queue.push(...openPack(p, m));
-    this.render();
+    this.openPacks(packs);
   }
 
-  addToTeam(pull: Pull, replaceIndex?: number) {
-    const owned = this.team.find(t => t.id === pull.id);
-    const better = (v?: Variant) => (VARIANT_RANK[pull.variant] > VARIANT_RANK[v ?? 'standard'] ? pull.variant : v);
-    if (owned) { owned.copies++; owned.stars = starsFor(owned.copies); owned.variant = better(owned.variant); }
-    else if (replaceIndex !== undefined) this.team[replaceIndex] = { id: pull.id, copies: 1, stars: 1, variant: pull.variant };
-    else if (this.team.length < TUNING.maxHelpers) this.team.push({ id: pull.id, copies: 1, stars: 1, variant: pull.variant });
-    this.queue.shift();
+  /** Opens packs one card at a time, then comes back to the Market. */
+  openPacks(types: string[]) {
+    const cards: Pull[] = [];
+    for (const t of types) cards.push(...openPack(t, this.m, this.save));
+    this.questNews.push(...bump(this.save, 'packs', types.length));
+    writeSave(this.save);
     this.render();
+    this.reveal.show(cards, this.loadout, () => this.m, () => {
+      this.questNews.push(...this.reveal.questNews.splice(0));
+      this.render();
+    });
   }
 
   // ---------- tree ----------
@@ -105,7 +100,7 @@ export class Menu {
     const node = TREE.nodes[id];
     const rank = this.save.nodes[id] ?? 0;
     const cost = node.cost[rank];
-    if (cost === undefined || this.save.mastery < cost || !nodeUnlocked(this.save, id)) return;
+    if (node.quest || cost === undefined || this.save.mastery < cost || !nodeUnlocked(this.save, id)) return;
     const before = this.m;
     this.save.mastery -= cost;
     this.save.nodes[id] = rank + 1;
@@ -129,11 +124,11 @@ export class Menu {
         <header class="topbar">
           <h1>Heartseed</h1>
           ${s ? `<p class="summary">${s.won ? 'You beat the Frog King!' : 'The Heartseed fell.'} Lasted <b>${clock(s.seconds)}</b> · ${s.kills} kills · <b class="mastery">+${s.mastery} Mastery</b></p>` : '<p class="summary muted">Spend gold on packs, Mastery on upgrades, then defend the seed.</p>'}
+          ${this.questNews.length ? `<p class="quest-news">📜 Quest complete: <b>${[...new Set(this.questNews)].join(', ')}</b></p>` : ''}
         </header>
         ${this.marketHtml()}
         ${this.progressHtml()}
-      </div>
-      ${this.queue.length ? this.revealHtml() : ''}`;
+      </div>`;
     const market = this.root.querySelector('.market');
     if (market) market.scrollTop = scroll;
     // On narrow screens the tree is wider than the panel: start it centred on the seed.
@@ -170,8 +165,14 @@ export class Menu {
     }).join('');
     const rerollLabel = this.rerolls > 0 ? `↻ Reroll <small>free ×${this.rerolls}</small>` : `↻ Reroll <small>${SHOP.rerollCost} gold</small>`;
     const canReroll = this.rerolls > 0 || this.gold >= SHOP.rerollCost;
-    const team = Array.from({ length: TUNING.maxHelpers }, (_, i) => {
-      const t = this.team[i];
+    const spells = Array.from({ length: TUNING.spells.slots }, (_, i) => {
+      const sp = this.loadout.spells[i];
+      if (!sp) return `<div class="chip empty spell"><span class="muted small">spell</span></div>`;
+      const d = SPELLS[sp.id];
+      return `<div class="chip spell" style="--tag:${hex(TAG_COLOR[d.tag])}" title="${d.name}: ${d.desc}"><span>${d.icon} ${d.name}</span><span class="stars">${'★'.repeat(sp.stars)}</span></div>`;
+    }).join('');
+    const team = Array.from({ length: m.maxHelpers }, (_, i) => {
+      const t = this.loadout.team[i];
       if (!t) return `<div class="chip empty"></div>`;
       const d = HEROES[t.id];
       return `<div class="chip ${t.variant ?? ''} r-${d.rarity}" style="--tag:${hex(TAG_COLOR[d.tag])}" title="${d.name}${t.variant && t.variant !== 'standard' ? ' · ' + VARIANT_LABEL[t.variant] : ''}">
@@ -186,6 +187,8 @@ export class Menu {
         <div class="combs">${this.combsHtml(m)}</div>
         <div class="sub-head"><h3>Your team this run</h3><span class="muted small">lasts one run · duplicates add ★</span></div>
         <div class="team">${team}</div>
+        <div class="team spells">${spells}</div>
+        <p class="muted small nectar-note">🍯 Kills drop Nectar. Spend it on more packs in the middle of a run.</p>
       </section>`;
   }
 
@@ -231,9 +234,15 @@ export class Menu {
         ${this.tab === 'upgrades' ? this.treeHtml() : this.collectionHtml()}
         <footer class="progress-foot">
           ${this.tab === 'upgrades' ? this.detailHtml() : '<div></div>'}
-          <button class="battle" data-start>Battle<small>${this.team.length ? `${this.team.length} helper${this.team.length > 1 ? 's' : ''}` : 'Stinger only'}</small></button>
+          <button class="battle" data-start>Battle<small>${this.loadoutLabel()}</small></button>
         </footer>
       </section>`;
+  }
+
+  loadoutLabel() {
+    const h = this.loadout.team.length, sp = this.loadout.spells.length;
+    if (!h && !sp) return 'Stinger only';
+    return [h ? `${h} helper${h > 1 ? 's' : ''}` : '', sp ? `${sp} spell${sp > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
   }
 
   treeHtml() {
@@ -245,12 +254,27 @@ export class Menu {
       const from = p.parent ? L.nodes[p.parent] : { x: 0, y: 0 };
       const n = TREE.nodes[p.id];
       const color = TREE.branches[p.branch].color;
-      const cls = rankOf(p.id) ? 'lit' : nodeUnlocked(this.save, p.id) ? 'open' : 'shut';
+      const cls = (n.quest ? questDone(this.save, p.id) : rankOf(p.id)) ? 'lit' : nodeUnlocked(this.save, p.id) ? 'open' : 'shut';
       return `<line class="edge ${cls}" x1="${from.x}" y1="${from.y}" x2="${p.x}" y2="${p.y}" style="--c:${color}" data-for="${n.name}"/>`;
     }).join('');
     const hexR = hexPoints(R);
     const nodes = Object.values(L.nodes).map(p => {
       const n = TREE.nodes[p.id];
+      if (n.quest) {
+        // Quest cells fill up as you play instead of costing Mastery.
+        const have = questProgress(this.save, p.id), done = questDone(this.save, p.id), w = 0.78;
+        return `<g class="tnode quest ${done ? 'maxed' : ''} ${this.selected === p.id ? 'sel' : ''}" data-node="${p.id}" transform="translate(${p.x.toFixed(3)} ${p.y.toFixed(3)})" style="--c:${TREE.branches[p.branch].color}">
+          <title>Quest: ${n.name}</title>
+          <polygon class="halo" points="${hexPoints(R + 0.09)}"/>
+          <polygon class="cell" points="${hexR}"/>
+          <text class="icon" y="0.02">${done ? '✅' : n.icon}</text>
+          <g class="lvl" transform="translate(0 ${R + 0.14})">
+            <rect x="${-w / 2}" y="-0.11" width="${w}" height="0.22" rx="0.11"/>
+            <rect class="lvl-fill" x="${-w / 2}" y="-0.11" width="${(w * have / n.quest.goal).toFixed(3)}" height="0.22" rx="0.11"/>
+            <text y="0.005">${done ? 'Done' : `${have}/${n.quest.goal}`}</text>
+          </g>
+        </g>`;
+      }
       const rank = rankOf(p.id), max = n.cost.length;
       const unlocked = nodeUnlocked(this.save, p.id);
       const hidden = !!n.hero && !unlocked; // unpulled hero: show a mystery cell
@@ -290,6 +314,16 @@ export class Menu {
     }
     const n = TREE.nodes[id];
     const b = TREE.branches[n.branch];
+    if (n.quest) {
+      const have = questProgress(this.save, id), done = questDone(this.save, id);
+      return `<div class="detail" style="--c:${b.color}">
+        <div class="detail-top"><span class="detail-icon">${done ? '✅' : n.icon}</span>
+          <div class="detail-text"><b>${n.name}</b> <span class="muted small">${n.branch} · Quest · ${have}/${n.quest.goal}</span>
+            <p><b>${n.quest.task}.</b> Reward: ${n.desc}.</p></div>
+          <div class="detail-act">${done ? '<span class="maxed">Reward active</span>' : '<span class="needs">Costs no Mastery. Just play.</span>'}</div>
+          <button class="close" data-node="" aria-label="Close">×</button></div>
+      </div>`;
+    }
     const rank = this.save.nodes[id] ?? 0, max = n.cost.length;
     const unlocked = nodeUnlocked(this.save, id);
     const cost = n.cost[rank];
@@ -331,35 +365,18 @@ export class Menu {
       <div class="collection">
         <p class="muted small">${got}/${HERO_IDS.length} heroes · ${variantsGot}/${HERO_IDS.length * 3} variants. Foil and Holo copies hit harder (+${variantDamage('foil') * 100}% / +${variantDamage('holo') * 100}% damage).</p>
         <div class="ccards">${cards}</div>
+        <h3>Spells</h3>
+        <div class="ccards">${SPELL_IDS.map(id => {
+          const d = SPELLS[id];
+          return this.save.spellsPulled.includes(id)
+            ? `<div class="ccard spell" style="--tag:${hex(TAG_COLOR[d.tag])}"><span class="spell-icon">${d.icon}</span><b>${d.name}</b><span class="small">${d.desc}</span></div>`
+            : `<div class="ccard unknown spell"><span class="q">?</span><span class="small muted">spell</span></div>`;
+        }).join('')}</div>
         <h3>Your pull odds</h3>
         <table class="odds"><tr><th></th>${order.map(r => `<th class="r-${r}">${r}</th>`).join('')}</tr>
           ${row('Meadow', 'meadow')}${row('Grove', 'grove')}</table>
-        <p class="muted small">Any card: Foil ${pct(m.foilChance * 100)} · Holo ${pct(m.holoChance * 100)} · bonus card ${pct(m.bonusCardChance * 100)}. Raise these in the Fortune branch.</p>
+        <p class="muted small">Any card: Foil ${pct(m.foilChance * 100)} · Holo ${pct(m.holoChance * 100)} · bonus card ${pct(m.bonusCardChance * 100)}. Raise these in the Fortune branch. About 1 card in ${Math.round(1 / TUNING.spells.chancePerCard)} is a spell. After ${TUNING.pity.packsWithoutEpic} packs with nothing Epic or better, the next one is guaranteed (you're at ${Math.min(this.save.pity, TUNING.pity.packsWithoutEpic)}).</p>
         <button class="link" data-reset>Reset all progress</button>
-      </div>`;
-  }
-
-  revealHtml() {
-    const pull = this.queue[0];
-    const d = HEROES[pull.id];
-    const owned = this.team.find(t => t.id === pull.id);
-    const full = !owned && this.team.length >= TUNING.maxHelpers;
-    const fancy = pull.variant !== 'standard' ? `${VARIANT_LABEL[pull.variant]} · +${variantDamage(pull.variant) * 100}% damage` : '';
-    const note = owned ? `Duplicate! ${'★'.repeat(starsFor(owned.copies + 1))}` : full ? 'Team full: swap someone out?' : 'New helper';
-    const actions = full
-      ? `<div class="swap">${this.team.map((t, i) => `<button data-replace="${i}">Swap ${HEROES[t.id].name}</button>`).join('')}<button class="secondary" data-discard>Discard</button></div>`
-      : `<button data-keep>Continue</button>`;
-    return `
-      <div class="reveal">
-        <p class="muted">${this.queue.length > 1 ? `${this.queue.length} cards left` : 'Last card'} · tap the card to flip it</p>
-        <div class="card ${d.rarity} ${pull.variant}" data-card>
-          <div class="back"><span>?</span></div>
-          <div class="face" style="--tag:${hex(TAG_COLOR[d.tag])}">
-            <b>${d.name}</b><span>${d.rarity.toUpperCase()}</span><span>${d.tag === 'none' ? '' : d.tag.toUpperCase()}</span>
-            ${fancy ? `<strong class="vtag">${fancy}</strong>` : ''}<em>${note}</em>
-          </div>
-        </div>
-        <div class="reveal-actions" hidden>${actions}</div>
       </div>`;
   }
 
@@ -372,7 +389,7 @@ export class Menu {
     q<HTMLElement>('[data-node]').forEach(b => b.onclick = () => { this.selected = b.dataset.node || null; this.render(); });
     q<HTMLButtonElement>('[data-goto]').forEach(b => b.onclick = () => { this.tab = 'upgrades'; this.selected = b.dataset.goto!; this.render(); });
     q<HTMLButtonElement>('[data-buy-node]').forEach(b => b.onclick = () => this.buyNode(b.dataset.buyNode!));
-    q<HTMLButtonElement>('[data-start]').forEach(b => b.onclick = () => { this.close(); this.onStart(this.team); });
+    q<HTMLButtonElement>('[data-start]').forEach(b => b.onclick = () => { this.close(); this.onStart(this.loadout); });
     q<HTMLButtonElement>('[data-refund]').forEach(b => b.onclick = () => {
       const before = this.m;
       refundAll(this.save); writeSave(this.save);
@@ -382,18 +399,6 @@ export class Menu {
       this.offers.length = Math.min(this.offers.length, after.offerSlots);
       this.render();
     });
-    q<HTMLDivElement>('[data-card]').forEach(c => c.onclick = () => {
-      const { id, variant } = this.queue[0];
-      if (!this.save.pulled.includes(id)) this.save.pulled.push(id);
-      const vs = (this.save.variants[id] ??= []);
-      if (!vs.includes(variant)) vs.push(variant);
-      writeSave(this.save);
-      c.classList.add('flipped');
-      this.root.querySelector<HTMLElement>('.reveal-actions')!.hidden = false;
-    });
-    q<HTMLButtonElement>('[data-keep]').forEach(b => b.onclick = () => this.addToTeam(this.queue[0]));
-    q<HTMLButtonElement>('[data-replace]').forEach(b => b.onclick = () => this.addToTeam(this.queue[0], Number(b.dataset.replace)));
-    q<HTMLButtonElement>('[data-discard]').forEach(b => b.onclick = () => { this.queue.shift(); this.render(); });
     q<HTMLButtonElement>('[data-reset]').forEach(b => b.onclick = () => {
       if (b.dataset.armed) { resetSave(); Object.assign(this.save, freshSave()); this.selected = null; this.open(null); return; }
       b.dataset.armed = '1'; b.textContent = 'Tap again to erase everything';

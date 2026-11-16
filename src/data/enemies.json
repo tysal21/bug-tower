@@ -3,5 +3,6 @@
   "snail": {"name": "Ironshell Snail", "hp": 120, "speed": 28, "armor": 0.6, "flying": false, "physicalImmune": false, "seedDps": 12, "size": 18},
   "wasp": {"name": "Wasp Raider", "hp": 40, "speed": 80, "armor": 0, "flying": true, "physicalImmune": false, "seedDps": 6, "size": 12},
   "wisp": {"name": "Blight Wisp", "hp": 50, "speed": 42, "armor": 0, "flying": false, "physicalImmune": true, "seedDps": 8, "size": 14},
+  "toad": {"name": "Toad Brute", "hp": 420, "speed": 26, "armor": 0.1, "flying": false, "physicalImmune": false, "seedDps": 14, "size": 26, "miniBoss": true},
   "frogking": {"name": "Frog King", "hp": 1400, "speed": 22, "armor": 0.2, "flying": false, "physicalImmune": false, "seedDps": 15, "size": 40, "boss": true}
 }

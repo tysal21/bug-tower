@@ -11,17 +11,29 @@ export interface SaveData {
   bossKills: number;
   pulled: string[]; // every hero you've ever pulled (feeds Legends nodes and the Collection)
   variants: Record<string, Variant[]>; // hero id -> variants you've pulled (Collection)
+  spellsPulled: string[]; // every spell you've ever pulled (Collection)
   combs: number[]; // brood combs: time (ms) each one started its current egg
+  counters: Record<string, number>; // quest counters, e.g. packs, wildfires, "pull:ant"
+  questsDone: string[]; // quest nodes already finished (so each one is announced once)
+  pity: number; // packs opened in a row with nothing Epic or better
 }
 
 export function freshSave(): SaveData {
-  return { mastery: 0, nodes: {}, runs: 0, bestTime: 0, bossKills: 0, pulled: [], variants: {}, combs: [] };
+  return {
+    mastery: 0, nodes: {}, runs: 0, bestTime: 0, bossKills: 0, pulled: [], variants: {}, spellsPulled: [], combs: [],
+    counters: {}, questsDone: [], pity: 0,
+  };
 }
 
 export function loadSave(): SaveData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...freshSave(), ...JSON.parse(raw) };
+    if (raw) {
+      const s: SaveData = { ...freshSave(), ...JSON.parse(raw) };
+      // Saves from before quests existed: carry over what we already know.
+      s.counters.bossKills = Math.max(s.counters.bossKills ?? 0, s.bossKills);
+      return s;
+    }
   } catch { /* storage blocked: play without saving */ }
   return freshSave();
 }

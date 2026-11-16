@@ -1,6 +1,6 @@
 import shopJson from '../data/shop.json';
 import treeJson from '../data/tree.json';
-import { HEROES, HERO_IDS, HeroDef } from '../game/data';
+import { HEROES, HERO_IDS, HeroDef, SPELL_IDS, TUNING } from '../game/data';
 import { SaveData, Variant } from './save';
 
 export type Rarity = HeroDef['rarity'];
@@ -8,9 +8,11 @@ export interface ShopItem { name: string; cost: number; packs: number; packType:
 export interface TreeNode {
   branch: string; name: string; desc: string; icon: string; cost: number[]; effect: Record<string, number>;
   parent?: string; hero?: string; tier?: 'early' | 'core' | 'late';
+  /** Quest nodes are earned by doing something instead of spending Mastery. */
+  quest?: { counter: string; goal: number; task: string };
 }
 export interface Branch { color: string; angle: number; blurb: string }
-export interface Pull { id: string; variant: Variant }
+export interface Pull { id: string; variant: Variant; kind: 'hero' | 'spell' }
 
 export const SHOP = shopJson as {
   offerSlots: number; rerollCost: number; items: Record<string, ShopItem>;
@@ -44,6 +46,7 @@ export interface MetaStats {
   bonusCardChance: number; critChance: number; bounces: number; healPerKill: number; seedRegen: number; bossVuln: number;
   combs: number; hatchSpeed: number; twinChance: number; jellyChance: number;
   rarityBoost: number; legendaryBoost: number; foilChance: number; holoChance: number;
+  maxHelpers: number; nectarMult: number; spellHaste: number; wildfireRadius: number; stingerWebBonus: number; antStart: number;
   heroDmg: Record<string, number>; // extra damage per hero from Legends nodes
 }
 
@@ -55,19 +58,49 @@ export function metaStats(save: SaveData): MetaStats {
     bonusCardChance: 0, critChance: 0, bounces: 0, healPerKill: 0, seedRegen: 0, bossVuln: 0,
     combs: 0, hatchSpeed: 0, twinChance: 0, jellyChance: 0,
     rarityBoost: 0, legendaryBoost: 0, foilChance: SHOP.variants.foil.chance, holoChance: SHOP.variants.holo.chance,
+    maxHelpers: TUNING.maxHelpers, nectarMult: 1, spellHaste: 0, wildfireRadius: 0, stingerWebBonus: 0, antStart: 0,
+  };
+  const add = (effect: Record<string, number>, times: number) => {
+    for (const [k, v] of Object.entries(effect)) (s as unknown as Record<string, number>)[k] += v * times;
   };
   for (const [id, rank] of Object.entries(save.nodes)) {
     const node = TREE.nodes[id];
-    if (!node) continue;
+    if (!node || node.quest) continue;
     if (node.hero) { s.heroDmg[node.hero] = TREE_DATA.legends.dmgPerRank * rank; continue; }
-    for (const [k, v] of Object.entries(node.effect)) (s as unknown as Record<string, number>)[k] += v * rank;
+    add(node.effect, rank);
   }
+  // Quest rewards switch on by themselves once the goal is reached.
+  for (const [id, node] of Object.entries(TREE.nodes)) if (node.quest && questDone(save, id)) add(node.effect, 1);
   return s;
+}
+
+// ---------- quests ----------
+export function questProgress(save: SaveData, id: string) {
+  const q = TREE.nodes[id].quest!;
+  return Math.min(q.goal, save.counters[q.counter] ?? 0);
+}
+export function questDone(save: SaveData, id: string) {
+  const q = TREE.nodes[id].quest;
+  return !!q && (save.counters[q.counter] ?? 0) >= q.goal;
+}
+export const QUEST_IDS = Object.keys(TREE.nodes).filter(id => TREE.nodes[id].quest);
+
+/** Adds to a quest counter. Returns the names of any quests this just finished. */
+export function bump(save: SaveData, counter: string, n = 1): string[] {
+  save.counters[counter] = (save.counters[counter] ?? 0) + n;
+  const fresh: string[] = [];
+  for (const id of QUEST_IDS) {
+    if (TREE.nodes[id].quest!.counter !== counter || save.questsDone.includes(id) || !questDone(save, id)) continue;
+    save.questsDone.push(id);
+    fresh.push(TREE.nodes[id].name);
+  }
+  return fresh;
 }
 
 /** A node can be bought once its parent has a rank (Legends: once you've pulled that hero). */
 export function nodeUnlocked(save: SaveData, id: string) {
   const n = TREE.nodes[id];
+  if (n.quest) return true; // quests always count, whatever you own
   if (n.hero) return save.pulled.includes(n.hero);
   return !n.parent || (save.nodes[n.parent] ?? 0) > 0;
 }
@@ -102,23 +135,36 @@ export function packOdds(packType: string, m: MetaStats): Record<Rarity, number>
   return w;
 }
 
-/** One card from a pack of the given type, with its variant. */
-export function rollCard(packType: string, m: MetaStats): Pull {
+const RARITY_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
+
+/** One card from a pack of the given type, with its variant. minRarity is used by the pity rule. */
+export function rollCard(packType: string, m: MetaStats, minRarity?: Rarity): Pull {
+  if (!minRarity && Math.random() < TUNING.spells.chancePerCard) {
+    return { id: SPELL_IDS[Math.floor(Math.random() * SPELL_IDS.length)], variant: 'standard', kind: 'spell' };
+  }
   const odds = packOdds(packType, m);
-  let r = Math.random() * 100;
-  let rarity: Rarity = 'common';
-  for (const [k, v] of Object.entries(odds) as [Rarity, number][]) { if (r < v) { rarity = k; break; } r -= v; }
+  const allowed = RARITY_ORDER.filter(k => !minRarity || RARITY_ORDER.indexOf(k) >= RARITY_ORDER.indexOf(minRarity));
+  let r = Math.random() * allowed.reduce((a, k) => a + odds[k], 0);
+  let rarity: Rarity = allowed[0];
+  for (const k of allowed) { if (r < odds[k]) { rarity = k; break; } r -= odds[k]; }
   const pool = HERO_IDS.filter(id => HEROES[id].rarity === rarity);
   const id = pool[Math.floor(Math.random() * pool.length)];
   const v = Math.random();
   const variant: Variant = v < m.holoChance ? 'holo' : v < m.holoChance + m.foilChance ? 'foil' : 'standard';
-  return { id, variant };
+  return { id, variant, kind: 'hero' };
 }
 
-/** All the cards in one pack (Lucky Rip can add a bonus card). */
-export function openPack(packType: string, m: MetaStats): Pull[] {
-  const cards = [rollCard(packType, m)];
+const isBig = (p: Pull) => p.kind === 'hero' && RARITY_ORDER.indexOf(HEROES[p.id].rarity) >= 2;
+
+/**
+ * All the cards in one pack (Lucky Rip can add a bonus card).
+ * Pity: after a dry streak with nothing Epic or better, the pack's card is guaranteed Epic+.
+ */
+export function openPack(packType: string, m: MetaStats, save: SaveData): Pull[] {
+  const pity = save.pity >= TUNING.pity.packsWithoutEpic;
+  const cards = [rollCard(packType, m, pity ? 'epic' : undefined)];
   if (Math.random() < m.bonusCardChance) cards.push(rollCard(packType, m));
+  save.pity = cards.some(isBig) ? 0 : save.pity + 1;
   return cards;
 }
 
@@ -151,13 +197,13 @@ export function hatchComb(save: SaveData, i: number, m: MetaStats, now = Date.no
 export function refundAll(save: SaveData) {
   for (const [id, rank] of Object.entries(save.nodes)) {
     const node = TREE.nodes[id];
-    if (node) for (let i = 0; i < rank; i++) save.mastery += node.cost[i];
+    if (node && !node.quest) for (let i = 0; i < rank; i++) save.mastery += node.cost[i];
   }
   save.nodes = {};
   save.combs = [];
 }
 
 /** Mastery earned from a run. */
-export function masteryFor(kills: number, seconds: number, bossKilled: boolean, mult: number) {
-  return Math.round((kills * 0.5 + seconds / 10 + (bossKilled ? 100 : 0)) * mult);
+export function masteryFor(kills: number, seconds: number, bossKilled: boolean, mult: number, miniBosses = 0) {
+  return Math.round((kills * 0.5 + seconds / 10 + miniBosses * TUNING.miniBoss.mastery + (bossKilled ? 100 : 0)) * mult);
 }

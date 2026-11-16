@@ -2,6 +2,7 @@
 import heroesJson from '../data/heroes.json';
 import enemiesJson from '../data/enemies.json';
 import tuningJson from '../data/tuning.json';
+import spellsJson from '../data/spells.json';
 
 export type Tag = 'web' | 'ember' | 'swarm' | 'none';
 export type DamageType = 'physical' | 'fire';
@@ -39,6 +40,21 @@ export interface EnemyDef {
   seedDps: number;
   size: number;
   boss?: boolean;
+  miniBoss?: boolean;
+}
+
+export interface SpellDef {
+  name: string;
+  tag: Tag;
+  icon: string;
+  desc: string;
+  cooldown: number;
+  webSec?: number;
+  burnSec?: number;
+  burnDps?: number;
+  maxWildfires?: number;
+  rallySec?: number;
+  rallyBonus?: number;
 }
 
 
@@ -46,6 +62,8 @@ export const HEROES = heroesJson as Record<string, HeroDef>;
 export const ENEMIES = enemiesJson as Record<string, EnemyDef>;
 export const TUNING = tuningJson;
 export const HERO_IDS = Object.keys(HEROES);
+export const SPELLS = spellsJson as Record<string, SpellDef>;
+export const SPELL_IDS = Object.keys(SPELLS);
 
 // Greybox colours: one colour per combo tag so you can read the board at a glance.
 export const TAG_COLOR: Record<Tag, number> = {

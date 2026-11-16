@@ -1,23 +1,27 @@
 import Phaser from 'phaser';
-import { ENEMIES, HEROES, HERO_IDS, TUNING, DamageType, TAG_COLOR } from '../game/data';
+import { ENEMIES, HEROES, HERO_IDS, SPELLS, TUNING, DamageType, TAG_COLOR } from '../game/data';
 import { Enemy } from '../game/Enemy';
 import { Hero } from '../game/Hero';
-import { MetaStats, variantDamage } from '../meta/meta';
-import type { Variant } from '../meta/save';
+import { MetaStats, bump, openPack, variantDamage } from '../meta/meta';
+import type { Loadout } from '../meta/run';
+import type { SaveData } from '../meta/save';
+import type { Reveal } from '../ui/reveal';
 
 export const W = 1280;
 export const H = 720;
 const SEED = { x: 640, y: 360, r: 40 };
 /** Where a helper idles when nothing is near: spread around the seed. */
-function homeFor(i: number) {
-  const a = -Math.PI / 2 + (i * Math.PI * 2) / TUNING.maxHelpers + 0.3;
+function homeFor(i: number, slots: number) {
+  const a = -Math.PI / 2 + (i * Math.PI * 2) / slots + 0.3;
   const r = 85 + (i % 2) * 35;
   return { x: SEED.x + Math.cos(a) * r, y: SEED.y + Math.sin(a) * r };
 }
 
-export interface TeamMember { id: string; copies: number; stars: number; variant?: Variant }
-export interface RunResult { won: boolean; seconds: number; kills: number }
-export interface RunSetup { team: TeamMember[]; meta: MetaStats; onEnd?: (r: RunResult) => void }
+export interface RunResult { won: boolean; seconds: number; kills: number; miniBosses: number; quests: string[] }
+export interface RunSetup { loadout: Loadout; meta: MetaStats; save: SaveData; reveal: Reveal; onEnd?: (r: RunResult) => void }
+
+interface SpellButton { id: string; box: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text }
+const BTN = { w: 190, h: 44 };
 
 interface Trap { x: number; y: number; r: number; until: number; gfx: Phaser.GameObjects.Arc }
 
@@ -37,9 +41,23 @@ export class BattleScene extends Phaser.Scene {
   time_ = 0;
   speed = 1;
   testMode = false;
-  stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0 };
-  team: TeamMember[] = [];
+  stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0, miniBosses: 0, packs: 0 };
+  loadout: Loadout = { team: [], spells: [] };
   meta!: MetaStats;
+  save!: SaveData;
+  reveal!: Reveal;
+  maxHelpers = TUNING.maxHelpers;
+  nectar = 0;
+  packsBought = 0;
+  packLock = 0;
+  miniIdx = 0; // next mini-boss in tuning.run.miniBossAtSec
+  questsDone: string[] = [];
+  rallyUntil = 0;
+  rallyBonus = 0;
+  spellCd: Record<string, { left: number; max: number }> = {};
+  spellButtons: SpellButton[] = [];
+  packBox!: Phaser.GameObjects.Rectangle;
+  packLabel!: Phaser.GameObjects.Text;
   maxSeedHp = TUNING.seedHp;
   onEnd: (r: RunResult) => void = () => {};
   bossBar!: Phaser.GameObjects.Graphics;
@@ -57,25 +75,34 @@ export class BattleScene extends Phaser.Scene {
   constructor() { super('battle'); }
 
   init(data: RunSetup) {
-    this.team = data.team ?? [];
+    this.loadout = data.loadout ?? { team: [], spells: [] };
     this.meta = data.meta;
+    this.save = data.save;
+    this.reveal = data.reveal;
     this.onEnd = data.onEnd ?? (() => {});
   }
 
   create() {
     const q = new URLSearchParams(location.search);
-    this.enemies = []; this.heroes = Array.from({ length: TUNING.maxHelpers }, () => null);
+    this.maxHelpers = this.meta.maxHelpers;
+    this.enemies = []; this.heroes = Array.from({ length: this.maxHelpers }, () => null);
     this.maxSeedHp = TUNING.seedHp * this.meta.seedHpMult;
     Enemy.webSlowBonus = this.meta.webSlow;
     this.seedHp = this.maxSeedHp;
     this.spawnDebt = 0; this.nextSurge = TUNING.run.surgeEverySec; this.boss = null; this.bossSpawned = false;
     this.bossTongue = 0; this.bossFlop = 0; this.traps = [];
     this.state = 'playing'; this.paused = false; this.time_ = 0;
-    this.stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0 };
+    this.stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0, miniBosses: 0, packs: 0 };
+    this.nectar = 0; this.packsBought = 0; this.miniIdx = 0; this.questsDone = [];
+    this.rallyUntil = 0; this.rallyBonus = 0; this.spellCd = {}; this.spellButtons = [];
     this.speed = Number(q.get('speed')) || 1;
     this.testMode = q.has('test');
     // ?boss skips ahead to 5 seconds before the Frog King, for testing.
     if (q.has('boss')) { this.time_ = TUNING.run.bossAtSec - 5; this.nextSurge = Infinity; }
+    // ?at=95 starts the run 95 seconds in (handy for testing mini-bosses).
+    if (q.has('at')) this.time_ = Number(q.get('at')) || 0;
+    this.miniIdx = TUNING.run.miniBossAtSec.filter(t => t < this.time_).length;
+    if (q.has('nectar')) this.nectar = Number(q.get('nectar')) || 0;
 
     // Ground: a top-down meadow with a worn circle around the seed.
     this.add.rectangle(W / 2, H / 2, W, H, 0x23301c);
@@ -103,21 +130,119 @@ export class BattleScene extends Phaser.Scene {
     this.input.on('pointerupoutside', () => { this.uiPress = false; });
 
     (window as unknown as { __battle: BattleScene }).__battle = this;
+    this.buildPackButton();
+    const kb = this.input.keyboard!;
+    kb.on('keydown-ONE', () => this.castSpell(0));
+    kb.on('keydown-TWO', () => this.castSpell(1));
+    kb.on('keydown-SPACE', () => this.buyPack());
     // Bring in the team bought in the shop.
-    this.team.forEach((m, i) => {
-      if (i >= TUNING.maxHelpers) return;
-      this.placeInSlot(i, m.id);
+    this.syncTeam();
+    this.drawHud();
+    this.showBanner(this.loadout.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!');
+  }
+
+  /** Makes the helpers and spell buttons on the field match the loadout (after the shop, and after each mid-run pack). */
+  syncTeam() {
+    this.loadout.team.forEach((m, i) => {
+      if (i >= this.maxHelpers) return;
+      if (this.heroes[i]?.id !== m.id) this.placeInSlot(i, m.id);
       const h = this.heroes[i]!;
       h.copies = m.copies; h.stars = m.stars; h.variant = m.variant ?? 'standard'; h.refresh();
     });
-    this.drawHud();
-    this.showBanner(this.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!');
+    for (const b of this.spellButtons) { b.box.destroy(); b.fill.destroy(); b.label.destroy(); }
+    this.spellButtons = this.loadout.spells.map((sp, i) => {
+      const x = 16 + i * (BTN.w + 10), y = H - BTN.h - 14;
+      const color = TAG_COLOR[SPELLS[sp.id].tag];
+      const box = this.add.rectangle(x, y, BTN.w, BTN.h, 0x1a2013, 0.92).setOrigin(0).setStrokeStyle(2, color).setDepth(10)
+        .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.castSpell(i));
+      const fill = this.add.rectangle(x, y, BTN.w, BTN.h, 0x000000, 0.6).setOrigin(0).setDepth(11);
+      const label = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
+      return { id: sp.id, box, fill, label };
+    });
+  }
+
+  // ---------- spells ----------
+  castSpell(i: number) {
+    const sp = this.loadout.spells[i];
+    if (!sp || this.paused || this.state !== 'playing' || (this.spellCd[sp.id]?.left ?? 0) > 0) return;
+    const d = SPELLS[sp.id];
+    const power = Math.pow(TUNING.spells.starPower, sp.stars - 1);
+    const max = (d.cooldown * Math.pow(TUNING.spells.starHaste, sp.stars - 1)) / (1 + this.meta.spellHaste);
+    this.spellCd[sp.id] = { left: max, max };
+    if (d.webSec) {
+      for (const e of this.enemies) if (e.alive) e.webUntil = Math.max(e.webUntil, this.time_ + d.webSec * power + this.meta.webSec);
+    }
+    if (d.burnSec) {
+      let fires = d.maxWildfires ?? 0;
+      for (const e of [...this.enemies]) {
+        if (!e.alive) continue;
+        if (e.webbed && fires > 0) { fires--; this.wildfire(e); }
+        if (!e.alive) continue;
+        e.burnUntil = Math.max(e.burnUntil, this.time_ + d.burnSec * power);
+        e.burnDps = Math.max(e.burnDps, (d.burnDps ?? 0) * this.meta.burnMult);
+      }
+    }
+    if (d.rallySec) { this.rallyUntil = this.time_ + d.rallySec * power; this.rallyBonus = d.rallyBonus ?? 0; }
+    this.showBanner(`${d.icon} ${d.name}!`);
+    this.cameras.main.flash(180, ...this.rgb(TAG_COLOR[d.tag]));
+  }
+
+  rgb(c: number): [number, number, number] { return [(c >> 16) & 255, (c >> 8) & 255, c & 255]; }
+
+  get rallying() { return this.rallyUntil > this.time_; }
+
+  drawSpells(dt: number) {
+    this.spellButtons.forEach((b, i) => {
+      const sp = this.loadout.spells[i];
+      const cd = this.spellCd[b.id];
+      if (cd && cd.left > 0) cd.left = Math.max(0, cd.left - dt);
+      const ratio = cd && cd.max ? cd.left / cd.max : 0;
+      b.fill.setDisplaySize(BTN.w * ratio, BTN.h).setVisible(ratio > 0);
+      const d = SPELLS[b.id];
+      b.label.setText(`[${i + 1}] ${d.name} ${'★'.repeat(sp?.stars ?? 1)}\n${ratio > 0 ? Math.ceil(cd!.left) + ' s' : 'READY'}`);
+      b.box.setFillStyle(ratio > 0 ? 0x1a2013 : 0x2f3a24, 0.92);
+    });
+  }
+
+  // ---------- Nectar and mid-run packs ----------
+  get packPrice() { return Math.round(TUNING.nectar.packPrice * Math.pow(TUNING.nectar.priceGrowth, this.packsBought)); }
+
+  buildPackButton() {
+    const x = W - BTN.w - 16, y = H - BTN.h - 14;
+    this.packBox = this.add.rectangle(x, y, BTN.w, BTN.h, 0x241f14, 0.92).setOrigin(0).setStrokeStyle(2, 0xf2c94c).setDepth(10)
+      .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.buyPack());
+    this.packLabel = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
+    this.packBox.setVisible(TUNING.nectar.enabled); this.packLabel.setVisible(TUNING.nectar.enabled);
+  }
+
+  /** Spend Nectar on a pack. The fight pauses while you flip the cards. */
+  buyPack() {
+    if (!TUNING.nectar.enabled || this.paused || performance.now() < this.packLock || this.state !== 'playing' || this.nectar < this.packPrice) return;
+    this.nectar -= this.packPrice;
+    this.packsBought++; this.stats.packs++;
+    this.paused = true;
+    this.uiPress = true; // don't sting with the press that bought the pack
+    const cards = openPack(TUNING.nectar.packType, this.meta, this.save);
+    this.quests(bump(this.save, 'packs'));
+    this.reveal.show(cards, this.loadout, () => this.meta, () => {
+      this.quests(this.reveal.questNews.splice(0));
+      this.syncTeam();
+      this.packLock = performance.now() + 250; // the Space press that kept the card shouldn't buy another pack
+      this.paused = false;
+    });
+  }
+
+  quests(names: string[]) {
+    for (const n of names) {
+      this.questsDone.push(n);
+      this.floatText(SEED.x, SEED.y - 70, `📜 Quest complete: ${n}`, '#ffd76e');
+    }
   }
 
   placeInSlot(slot: number, id: string) {
     const old = this.heroes[slot];
     old?.destroy();
-    const home = homeFor(slot);
+    const home = homeFor(slot, this.maxHelpers);
     // New helpers pop out of the seed (or take the replaced helper's spot) and walk home.
     const sx = old ? old.x : SEED.x, sy = old ? old.y : SEED.y;
     const h = id ? new Hero(this, id, HEROES[id], sx, sy) : null;
@@ -159,7 +284,7 @@ export class BattleScene extends Phaser.Scene {
       }
       if (!target || h.cooldown > 0) continue;
       let aps = h.def.attacksPerSec * this.meta.helperSpeedMult;
-      if (h.def.tag === 'swarm') aps *= 1 + (TUNING.swarmSpeedPerAlly + this.meta.swarmPerAlly) * (swarm - 1);
+      if (h.def.tag === 'swarm') aps *= (1 + (TUNING.swarmSpeedPerAlly + this.meta.swarmPerAlly) * (swarm - 1)) * (this.rallying ? 1 + this.rallyBonus : 1);
       h.cooldown = 1 / aps;
       this.shoot(h, target);
     }
@@ -250,6 +375,7 @@ export class BattleScene extends Phaser.Scene {
     if (d.sunderSec) e.sunderUntil = this.time_ + d.sunderSec;
     if (d.executeBelow && !e.def.boss && (e.webbed || e.burning) && e.hp / e.def.hp < d.executeBelow) {
       this.stats.executes++;
+      bump(this.save, 'executes');
       this.floatText(e.x, e.y - 30, 'EXECUTE', '#f5b301');
       this.kill(e);
     }
@@ -257,12 +383,14 @@ export class BattleScene extends Phaser.Scene {
 
   wildfire(origin: Enemy) {
     const wf = TUNING.wildfire;
+    const radius = wf.radius * (1 + this.meta.wildfireRadius);
     this.stats.wildfires++;
+    this.quests(bump(this.save, 'wildfires'));
     origin.webUntil = 0;
-    this.ring(origin.x, origin.y, wf.radius, 0xff5a1f);
+    this.ring(origin.x, origin.y, radius, 0xff5a1f);
     this.floatText(origin.x, origin.y - 34, 'WILDFIRE!', '#ff8a2a');
     for (const e of this.enemies) {
-      if (!e.alive || Math.hypot(e.x - origin.x, e.y - origin.y) > wf.radius) continue;
+      if (!e.alive || Math.hypot(e.x - origin.x, e.y - origin.y) > radius) continue;
       this.damage(e, wf.burst * this.meta.burnMult, 'fire');
       if (e.alive) { e.burnUntil = this.time_ + wf.burnSec; e.burnDps = Math.max(e.burnDps, wf.burnDps * this.meta.burnMult); }
     }
@@ -284,6 +412,12 @@ export class BattleScene extends Phaser.Scene {
   kill(e: Enemy) {
     if (!e.alive) return;
     this.stats.kills++;
+    this.nectar += TUNING.nectar.perKill * this.meta.nectarMult;
+    if (e.def.miniBoss) {
+      this.stats.miniBosses++;
+      this.nectar += TUNING.nectar.miniBossBounty;
+      this.floatText(e.x, e.y - 40, `Toad Brute down! +${TUNING.nectar.miniBossBounty} Nectar`, '#ffd76e');
+    }
     this.seedHp = Math.min(this.maxSeedHp, this.seedHp + this.meta.healPerKill);
     e.destroy();
   }
@@ -302,9 +436,11 @@ export class BattleScene extends Phaser.Scene {
     // The Stinger hits every enemy touching the circle.
     const hits = this.enemies.filter(e => e.alive && Math.hypot(e.x - p.worldX, e.y - p.worldY) <= radius + e.def.size);
     if (!hits.length) return;
-    this.stingerCooldown = 1 / (st.attacksPerSec * this.meta.stingerSpeedMult);
+    this.stingerCooldown = 1 / (st.attacksPerSec * this.meta.stingerSpeedMult * (this.rallying ? 1 + this.rallyBonus : 1));
     this.stats.stingerHits++;
-    for (const e of hits) this.damage(e, st.damage * this.meta.stingerDmgMult * (e.webbed ? 1 + st.webbedBonus : 1), 'physical');
+    const webbed = hits.filter(e => e.webbed).length;
+    if (webbed) this.quests(bump(this.save, 'webStings', webbed));
+    for (const e of hits) this.damage(e, st.damage * this.meta.stingerDmgMult * (e.webbed ? 1 + st.webbedBonus + this.meta.stingerWebBonus : 1), 'physical');
     this.ring(p.worldX, p.worldY, radius, 0xff4d6d);
   }
 
@@ -344,6 +480,12 @@ export class BattleScene extends Phaser.Scene {
       this.showBanner('Swarm incoming!');
       for (let i = 0; i < run.surgeSize; i++) this.spawn(this.pickEnemy());
     }
+    if (!this.bossSpawned && this.time_ >= (run.miniBossAtSec[this.miniIdx] ?? Infinity)) {
+      this.miniIdx++;
+      this.spawn(TUNING.miniBoss.enemy).timer = TUNING.miniBoss.eatEverySec;
+      this.showBanner('A Toad Brute appears!');
+      this.cameras.main.shake(250, 0.005);
+    }
     if (!this.bossSpawned && this.time_ >= run.bossAtSec) {
       this.bossSpawned = true;
       this.boss = this.spawn('frogking');
@@ -351,6 +493,25 @@ export class BattleScene extends Phaser.Scene {
       this.bossFlop = TUNING.boss.flopEverySec;
       this.showBanner('The Frog King arrives!');
       this.cameras.main.shake(400, 0.008);
+    }
+  }
+
+  // ---------- Toad Brute (mini-boss): swallows a nearby grub to heal ----------
+  updateMiniBosses(dt: number) {
+    const cfg = TUNING.miniBoss;
+    for (const t of this.enemies) {
+      if (!t.alive || !t.def.miniBoss) continue;
+      t.timer -= dt;
+      if (t.timer > 0 || t.hp >= t.maxHp) continue;
+      const snack = this.enemies.find(e => e.alive && e.id === 'grub' && Math.hypot(e.x - t.x, e.y - t.y) < cfg.eatRange);
+      if (!snack) continue;
+      t.timer = cfg.eatEverySec;
+      const line = this.add.line(0, 0, t.x, t.y, snack.x, snack.y, 0xff6b9a).setOrigin(0).setLineWidth(4).setDepth(7);
+      this.tweens.add({ targets: line, alpha: 0, duration: 350, onComplete: () => line.destroy() });
+      snack.destroy();
+      const heal = Math.min(t.maxHp - t.hp, t.maxHp * cfg.healFrac);
+      t.hp += heal;
+      this.floatText(t.x, t.y - 44, `GULP +${Math.round(heal)}`, '#7bd36b');
     }
   }
 
@@ -397,9 +558,12 @@ export class BattleScene extends Phaser.Scene {
     if (this.state !== 'playing') return;
     this.state = result;
     this.stingerDown = false;
+    if (result === 'won') this.quests(bump(this.save, 'bossKills'));
     this.banner.setText(result === 'won' ? 'The Heartseed survives!' : 'The Heartseed has fallen').setFontSize(36).setAlpha(1);
     // Short pause so you see what happened, then the menu takes over.
-    this.time.delayedCall(1400, () => this.onEnd({ won: result === 'won', seconds: Math.round(this.time_), kills: this.stats.kills }));
+    this.time.delayedCall(1400, () => this.onEnd({
+      won: result === 'won', seconds: Math.round(this.time_), kills: this.stats.kills, miniBosses: this.stats.miniBosses, quests: this.questsDone,
+    }));
   }
 
   // ---------- main loop ----------
@@ -410,9 +574,11 @@ export class BattleScene extends Phaser.Scene {
     this.time_ += dt;
 
     this.updateSpawns(dt);
+    this.updateMiniBosses(dt);
     this.updateBoss(dt);
     if (this.state !== 'playing') return;
     this.updateStinger(dt);
+    this.drawSpells(dt);
     this.updateHeroes(dt);
     this.updateTraps();
 
@@ -432,7 +598,13 @@ export class BattleScene extends Phaser.Scene {
   drawHud() {
     const left = TUNING.run.bossAtSec - this.time_;
     const timer = this.bossSpawned ? 'BOSS FIGHT' : `Boss in ${this.clock(left)}`;
-    this.hud.setText(`${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}`);
+    const nectarOn = TUNING.nectar.enabled;
+    this.hud.setText(`${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}${nectarOn ? `   Nectar ${Math.floor(this.nectar)}` : ''}${this.rallying ? '   RALLY!' : ''}`);
+    if (nectarOn) {
+      const can = this.nectar >= this.packPrice;
+      this.packLabel.setText(`Open a pack [Space]\n${Math.floor(this.nectar)} / ${this.packPrice} Nectar`).setColor(can ? '#1b1405' : '#a59a84');
+      this.packBox.setFillStyle(can ? 0xf2c94c : 0x241f14, 0.92);
+    }
     this.bossBar.clear();
     this.bossLabel.setText('');
     if (this.boss?.alive) {

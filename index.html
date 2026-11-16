@@ -7,17 +7,18 @@
     <style>
       html, body { margin: 0; height: 100%; background: #14110f; overflow: hidden; }
       #game { width: 100%; height: 100%; }
-      #menu { position: fixed; inset: 0; overflow: hidden; background: #10140c; color: #f0e6d2;
+      #menu, #reveal { position: fixed; inset: 0; overflow: hidden; background: #10140c; color: #f0e6d2;
         font: 15px/1.4 system-ui, -apple-system, sans-serif; z-index: 10;
         --panel: #1a2013; --line: #33402a; --muted: #a59a84; --gold: #f2c94c; --mastery: #8fd3ff; --leaf: #b8e986; }
-      #menu[hidden] { display: none; }
-      #menu .muted { color: var(--muted); } #menu .small { font-size: 12.5px; }
+      #reveal { z-index: 20; background: none; }
+      #menu[hidden], #reveal[hidden] { display: none; }
+      :is(#menu, #reveal) .muted { color: var(--muted); } :is(#menu, #reveal) .small { font-size: 12.5px; }
       #menu h1 { margin: 0; font: 600 22px/1 ui-monospace, monospace; color: var(--leaf); }
       #menu h2 { margin: 0; font: 600 13px/1 system-ui; text-transform: uppercase; letter-spacing: .12em; color: #cfc4ad; }
       #menu h3 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #cfc4ad; }
-      #menu button { font: inherit; color: #1b1405; background: var(--gold); border: 0; border-radius: 7px; padding: 8px 14px; cursor: pointer; }
-      #menu button:disabled { background: #3d3929; color: #857a64; cursor: default; }
-      #menu button.secondary { background: #34432a; color: #e6efd8; }
+      :is(#menu, #reveal) button { font: inherit; color: #1b1405; background: var(--gold); border: 0; border-radius: 7px; padding: 8px 14px; cursor: pointer; }
+      :is(#menu, #reveal) button:disabled { background: #3d3929; color: #857a64; cursor: default; }
+      :is(#menu, #reveal) button.secondary { background: #34432a; color: #e6efd8; }
       #menu button.link { background: none; color: var(--muted); text-decoration: underline; padding: 0; font-size: 12.5px; }
       .screen { height: 100%; display: grid; grid-template-columns: minmax(330px, 36%) 1fr; grid-template-rows: auto 1fr; gap: 10px;
         padding: 10px max(12px, env(safe-area-inset-left)) 12px; box-sizing: border-box; }
@@ -70,7 +71,11 @@
       .comb-text small { font-size: 11px; font-weight: 600; }
       .comb.locked .comb-text small { color: var(--muted); max-width: 90px; }
       @keyframes bob { 50% { transform: translateY(-3px); } }
-      .team { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+      .team { display: grid; grid-template-columns: repeat(auto-fit, minmax(48px, 1fr)); gap: 6px; }
+      .team.spells { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .chip.spell { border-style: double; border-width: 4px; } .chip.spell.empty { border: 2px dashed #34402a; place-items: center; }
+      .nectar-note { margin-top: 0 !important; }
+      .quest-news { margin: 0; color: #ffd76e; }
       .chip { border: 2px solid var(--tag, #444); border-radius: 8px; padding: 5px; font-size: 11.5px; display: grid; gap: 1px; min-height: 40px; background: #12160d; }
       .chip.empty { border: 2px dashed #34402a; background: none; }
       .chip .stars { color: #f5d76e; }
@@ -105,6 +110,9 @@
       .lvl rect { fill: #0d100a; stroke: #3a4430; stroke-width: .02; } .lvl .lvl-fill { fill: var(--c); stroke: none; opacity: .85; }
       .lvl text { font: 700 .15px ui-monospace, monospace; fill: #fff; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #0008; stroke-width: .03px; }
       .tnode.locked .lvl { opacity: .5; }
+      .tnode.quest .cell { stroke: #ffd76e; stroke-width: .05; stroke-dasharray: .1 .06; fill: #221f12; }
+      .tnode.quest.maxed .cell { stroke-dasharray: none; fill: color-mix(in srgb, #ffd76e 30%, #1c2216); }
+      .tnode.quest .lvl-fill { fill: #ffd76e; } .tnode.quest .lvl text { font-size: .14px; }
       .detail { flex: 1; min-width: 0; max-width: 560px; min-height: 64px; background: #12160d; border: 1px solid var(--c, var(--line)); border-radius: 12px;
         padding: 8px 12px; display: grid; gap: 5px; box-sizing: border-box; align-content: center; }
       .detail .detail-body { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -149,6 +157,9 @@
       .card .face { transform: rotateY(180deg); background: var(--tag); color: #111; border: 6px solid #666; align-content: center; gap: 6px; text-align: center; padding: 10px; }
       .card .vtag { background: #111; color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 12px; position: relative; }
       .card.flipped .back { transform: rotateY(180deg); } .card.flipped .face { transform: rotateY(360deg); }
+      .card .face small { font-size: 12px; } .spell-icon { font-size: 30px; }
+      .card.spell .back { box-shadow: 0 0 28px 6px #6ee7b7; } .card.spell .face { border: 6px double #134e4a; }
+      .ccard.spell { border-style: double; border-width: 5px; border-color: #134e4a; } .ccard.unknown.spell { border-color: #3a4430; }
       .card.rare .back { box-shadow: 0 0 28px 6px #3b82f6; } .card.rare .face { border-color: #3b82f6; }
       .card.epic .back { box-shadow: 0 0 34px 10px #a855f7; } .card.epic .face { border-color: #a855f7; }
       .card.legendary .back { box-shadow: 0 0 44px 14px #f5b301; animation: shake .3s 2; } .card.legendary .face { border-color: #f5b301; }
@@ -163,7 +174,7 @@
         .detail-top { grid-template-columns: auto 1fr auto; } .detail-act { grid-column: 1 / -1; max-width: none; } #menu .detail .close { grid-row: 1; grid-column: 3; }
         .progress-foot { flex-wrap: wrap; } .detail { flex-basis: 100%; max-width: none; } #menu button.battle { flex: 1; }
       }
-      @media (max-width: 480px) { .offers { gap: 6px; } .team { grid-template-columns: repeat(3, 1fr); } #menu button.battle { padding: 10px 22px; } }
+      @media (max-width: 480px) { .offers { gap: 6px; } .team { grid-template-columns: repeat(3, 1fr); } .team.spells { grid-template-columns: repeat(2, 1fr); } #menu button.battle { padding: 10px 22px; } }
     </style>
   </head>
   <body>

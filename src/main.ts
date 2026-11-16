@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
-import { BattleScene, W, H, TeamMember, RunResult } from './scenes/BattleScene';
+import { BattleScene, W, H, RunResult } from './scenes/BattleScene';
 import { Menu } from './ui/menu';
+import { Reveal } from './ui/reveal';
 import { loadSave, writeSave } from './meta/save';
 import { metaStats, masteryFor } from './meta/meta';
+import type { Loadout } from './meta/run';
 
 const save = loadSave();
 const game = new Phaser.Game({
@@ -13,12 +15,15 @@ const game = new Phaser.Game({
 });
 game.scene.add('battle', BattleScene, false);
 
-function startRun(team: TeamMember[]) {
-  game.scene.start('battle', { team, meta: metaStats(save), onEnd: endRun });
+// One card-reveal overlay shared by the Market and by packs opened mid-run.
+const reveal = new Reveal(save);
+
+function startRun(loadout: Loadout) {
+  game.scene.start('battle', { loadout, meta: metaStats(save), save, reveal, onEnd: endRun });
 }
 
 function endRun(r: RunResult) {
-  const mastery = masteryFor(r.kills, r.seconds, r.won, metaStats(save).masteryMult);
+  const mastery = masteryFor(r.kills, r.seconds, r.won, metaStats(save).masteryMult, r.miniBosses);
   save.mastery += mastery;
   save.runs++;
   save.bestTime = Math.max(save.bestTime, r.seconds);
@@ -28,12 +33,12 @@ function endRun(r: RunResult) {
   menu.open({ ...r, mastery });
 }
 
-const menu = new Menu(save, startRun);
+const menu = new Menu(save, reveal, startRun);
 (window as unknown as { __menu: Menu; __save: typeof save }).__menu = menu;
 (window as unknown as { __save: typeof save }).__save = save;
 
 // The very first run starts straight away with only the Stinger. After that, start at the menu.
 game.events.once('ready', () => {
-  if (save.runs === 0) startRun([]);
+  if (save.runs === 0) startRun({ team: [], spells: [] });
   else menu.open(null);
 });

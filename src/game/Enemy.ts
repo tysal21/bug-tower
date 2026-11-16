@@ -15,6 +15,7 @@ export class Enemy {
   sunderUntil = 0;
   heldUntil = 0; // pinned in place by a melee helper
   speedMult = 1;
+  timer = 0; // ability timer (Toad Brute's next snack)
   now = 0;
   body: Phaser.GameObjects.Shape;
   shadow?: Phaser.GameObjects.Ellipse;
@@ -40,6 +41,8 @@ export class Enemy {
     const s = def.size;
     if (def.boss) {
       this.body = scene.add.circle(x, y, s, 0x3f7a3a).setStrokeStyle(6, 0xd4af37).setDepth(3);
+    } else if (def.miniBoss) {
+      this.body = scene.add.circle(x, y, s, 0x5f8a3a).setStrokeStyle(5, 0xff9f43).setDepth(3);
     } else if (def.flying) {
       this.shadow = scene.add.ellipse(x, y + 14, s * 1.6, s * 0.6, 0x000000, 0.35);
       this.body = scene.add.triangle(x, y, 0, s * 2, s, 0, s * 2, s * 2, 0xf2d04c).setStrokeStyle(2, 0x3a2a00).setDepth(3);
