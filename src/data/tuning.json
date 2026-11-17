@@ -26,7 +26,7 @@
   "maxHelpers": 6,
   "heroLeash": 330,
   "run": {
-    "note": "Enemies spawn non-stop and ramp up until bossAtSec, then the Frog King arrives. Surges are short bursts that feel like waves.",
+    "note": "Enemies spawn non-stop and ramp up until bossAtSec, then the Frog King arrives. Surges are short bursts that feel like waves. The wave counter goes up by one at every surge.",
     "bossAtSec": 240,
     "spawnPerSecStart": 0.8,
     "spawnPerSecEnd": 2.8,
@@ -122,5 +122,36 @@
   "firstRun": {
     "note": "Your very first run is a forced, quick loss that opens the Market and skill tree. The seed starts this weak only on run 1.",
     "seedHp": 55
+  },
+  "chapters": {
+    "note": "Each Frog King you beat moves you to the next chapter. Inside an act, each chapter adds hpPerChapter enemy health (boss too) and spawnPerChapter spawn rate. After perAct chapters the next menu starts the next Act: the skill tree and Mastery reset and you keep Heartwood (1 per heartwoodPer Mastery you had invested). Each Heartwood gives +heartwoodMastery Mastery from runs, forever. acts[i]: hpMult = enemy health, armor = extra armor on every enemy, speedMult = enemy speed, mechanic = the line shown at the start of a run.",
+    "perAct": 3,
+    "hpPerChapter": 0.3,
+    "spawnPerChapter": 0.12,
+    "heartwoodPer": 200,
+    "heartwoodMastery": 0.02,
+    "acts": [
+      {
+        "name": "Act I",
+        "hpMult": 1,
+        "armor": 0,
+        "speedMult": 1,
+        "mechanic": ""
+      },
+      {
+        "name": "Act II",
+        "hpMult": 1.6,
+        "armor": 0.2,
+        "speedMult": 1,
+        "mechanic": "Blight-hardened shells: every enemy shrugs off 20% more physical damage"
+      },
+      {
+        "name": "Act III",
+        "hpMult": 2.4,
+        "armor": 0.2,
+        "speedMult": 1.2,
+        "mechanic": "Blight-hardened shells, and the swarm moves 20% faster"
+      }
+    ]
   }
 }

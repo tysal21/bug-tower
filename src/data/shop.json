@@ -1,15 +1,18 @@
 {
-  "note": "Shop items between runs, priced in coins. packType picks the odds below. requiresIncome = coins per visit needed before it shows up. requiresBossKills = Frog King wins needed. bonusNectar = Nectar you start the next run with. weight = how often it shows up in a shop slot. variants: base chance a card is Foil/Holo and the damage bonus each gives. brood: minutes for a comb to hatch a free pack.",
+  "note": "Shop items between runs, priced in coins. minCheap = a fresh shop always holds at least this many Meadow Packs, so pricier packs never crowd out cheap bodies. packType picks the odds below. requiresIncome = coins per visit needed before it shows up. requiresBossKills = Frog King wins needed (they carry over through Act resets). bonusNectar = Nectar you start the next run with. weight = how often it shows up in a shop slot. variants: base chance a card is Foil/Holo and the damage bonus each gives. brood: minutes for a comb to hatch a free pack.",
+  "minCheap": 2,
   "offerSlots": 3,
   "rerollCost": 1,
   "items": {
     "meadow": { "name": "Meadow Pack",   "cost": 2, "packs": 1, "packType": "meadow", "weight": 10 },
     "box":    { "name": "Meadow Box",    "cost": 5, "packs": 3, "packType": "meadow", "weight": 5, "requiresIncome": 5, "bonusNectar": 5 },
-    "grove":  { "name": "Grove Pack",    "cost": 6, "packs": 1, "packType": "grove",  "weight": 5, "requiresBossKills": 1 }
+    "grove":  { "name": "Grove Pack",    "cost": 6, "packs": 1, "packType": "grove",  "weight": 5, "requiresBossKills": 1 },
+    "elder":  { "name": "Elder Pack",    "cost": 9, "packs": 1, "packType": "elder",  "weight": 3, "requiresBossKills": 2 }
   },
   "packTypes": {
     "meadow": { "odds": { "common": 70, "rare": 24, "epic": 5,  "legendary": 1 } },
-    "grove":  { "odds": { "common": 35, "rare": 45, "epic": 16, "legendary": 4 } }
+    "grove":  { "odds": { "common": 35, "rare": 45, "epic": 16, "legendary": 4 } },
+    "elder":  { "odds": { "common": 0,  "rare": 0,  "epic": 75, "legendary": 25 } }
   },
   "variants": {
     "foil": { "chance": 0.05, "damage": 0.2 },
