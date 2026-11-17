@@ -64,6 +64,7 @@ export class Menu {
     if (this.gold < item.cost) return;
     this.gold -= item.cost;
     this.offers[slot] = null;
+    if (item.bonusNectar) this.loadout.nectar = (this.loadout.nectar ?? 0) + item.bonusNectar;
     this.openPacks(Array.from({ length: item.packs }, () => item.packType));
   }
 
@@ -85,14 +86,24 @@ export class Menu {
   /** Opens packs one card at a time, then comes back to the Market. */
   openPacks(types: string[]) {
     const cards: Pull[] = [];
-    for (const t of types) cards.push(...openPack(t, this.m, this.save));
+    for (const t of types) cards.push(...openPack(t, this.m, this.save, !this.loadout.team.length && !cards.some(c => c.kind === 'hero')));
+    const before = this.m;
     this.questNews.push(...bump(this.save, 'packs', types.length));
+    this.applyIncome(before);
     writeSave(this.save);
     this.render();
     this.reveal.show(cards, this.loadout, () => this.m, () => {
       this.questNews.push(...this.reveal.questNews.splice(0));
       this.render();
     });
+  }
+
+  /** A quest or upgrade that raised coins per visit pays out on this visit too. */
+  applyIncome(before: MetaStats) {
+    const after = this.m;
+    if (after.maxGold > before.maxGold) {
+      this.gold += after.maxGold - before.maxGold;
+    }
   }
 
   // ---------- tree ----------
@@ -123,7 +134,7 @@ export class Menu {
       <div class="screen">
         <header class="topbar">
           <h1>Heartseed</h1>
-          ${s ? `<p class="summary">${s.won ? 'You beat the Frog King!' : 'The Heartseed fell.'} Lasted <b>${clock(s.seconds)}</b> · ${s.kills} kills · <b class="mastery">+${s.mastery} Mastery</b></p>` : '<p class="summary muted">Spend gold on packs, Mastery on upgrades, then defend the seed.</p>'}
+          ${s ? `<p class="summary">${s.won ? 'You beat the Frog King!' : 'The Heartseed fell.'} Lasted <b>${clock(s.seconds)}</b> · ${s.kills} kills · <b class="mastery">+${s.mastery} Mastery</b></p>` : '<p class="summary muted">Spend coins on packs, Mastery on upgrades, then defend the seed.</p>'}
           ${this.questNews.length ? `<p class="quest-news">📜 Quest complete: <b>${[...new Set(this.questNews)].join(', ')}</b></p>` : ''}
         </header>
         ${this.marketHtml()}
@@ -140,7 +151,7 @@ export class Menu {
   currencyHtml() {
     const pips = Array.from({ length: this.m.maxGold }, (_, i) => `<span class="pip ${i < this.gold ? 'full' : ''}"></span>`).join('');
     return `<div class="purse">
-      <span class="coin" title="Gold: refills to full every run">${pips}<b>${this.gold}</b></span>
+      <span class="coin" title="Coins: refill to full every visit">${pips}<b>${this.gold}</b></span>
       <span class="mastery" title="Mastery: earned in runs, spent in the skill tree">✦ <b>${this.save.mastery}</b></span>
     </div>`;
   }
@@ -158,12 +169,12 @@ export class Menu {
           title="Rare+ ${pct(100 - odds.common)} · Legendary ${pct(odds.legendary)}">
         <div class="pack-art">${it.packs > 1 ? '<i></i><i></i><i></i>' : '<i></i>'}</div>
         <div class="offer-name">${it.name}</div>
-        <div class="offer-sub">${it.packs > 1 ? `${it.packs} packs` : '1 pack'}${it.packType === 'grove' ? ' · rare odds' : ''} ${deal}</div>
+        <div class="offer-sub">${it.packs > 1 ? `${it.packs} packs` : '1 pack'}${it.packType === 'grove' ? ' · rare odds' : ''}${it.bonusNectar ? ` · +${it.bonusNectar} Nectar` : ''} ${deal}</div>
         <div class="offer-odds">Rare+ ${pct(100 - odds.common)}</div>
         <span class="price">${it.cost} <span class="pip full"></span></span>
       </button>`;
     }).join('');
-    const rerollLabel = this.rerolls > 0 ? `↻ Reroll <small>free ×${this.rerolls}</small>` : `↻ Reroll <small>${SHOP.rerollCost} gold</small>`;
+    const rerollLabel = this.rerolls > 0 ? `↻ Reroll <small>free ×${this.rerolls}</small>` : `↻ Reroll <small>${SHOP.rerollCost} coin</small>`;
     const canReroll = this.rerolls > 0 || this.gold >= SHOP.rerollCost;
     const spells = Array.from({ length: TUNING.spells.slots }, (_, i) => {
       const sp = this.loadout.spells[i];
