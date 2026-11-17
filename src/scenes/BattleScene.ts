@@ -220,7 +220,7 @@ export class BattleScene extends Phaser.Scene {
     this.packLabel = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
     this.packBox.setVisible(TUNING.nectar.enabled); this.packLabel.setVisible(TUNING.nectar.enabled);
     // Meadow Pack sprite peeking over the button's left edge.
-    this.add.sprite(x - 8, y + BTN.h / 2 - 4, 'pack_meadow', 0).setScale(1.5).setAngle(-12).setDepth(12).setVisible(TUNING.nectar.enabled).play('pack_meadow-idle');
+    this.add.sprite(x - 8, y + BTN.h / 2 - 4, 'pack_meadow', 0).setScale(0.75).setAngle(-12).setDepth(12).setVisible(TUNING.nectar.enabled).play('pack_meadow-idle');
   }
 
   /** Spend Nectar on a pack. The fight pauses while you flip the cards. */

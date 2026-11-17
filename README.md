@@ -32,6 +32,7 @@ Useful extras: add `?speed=3` to the address to run the game 3x faster, `?test` 
 - `src/ui/reveal.ts` - the card flip, shared by the Market and by packs opened mid-run.
 - `src/meta/run.ts` - the team and spells you carry for one run.
 - `src/data/spells.json` - the three spells.
+- `scripts/art/pixellab.py` - regenerates the sprites with PixelLab (needs a PixelLab API token and Pillow).
 - `src/ui/treeGraph.ts` - lays the skill tree out as a honeycomb around the Heartseed.
 - `src/meta/` - saving progress, skill tree effects, shop rolls.
 - `src/data/shop.json`, `src/data/tree.json` - shop items, pack odds and skill tree nodes.

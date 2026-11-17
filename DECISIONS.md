@@ -2,6 +2,18 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-17 (PixelLab art, PR on top of #4)
+- **All 17 sprites now come from PixelLab** (pixflux for the pose, animate-with-text v3 for the second frame). Same file names and 2-frame strips as the hand-drawn set; frames are about 2x bigger and drawn at 1x, so on-screen size is about the same with much more detail.
+- Generator: `scripts/art/pixellab.py` (prompts, sizes and frame picks in one table). Raw outputs cached in `scripts/art/pixellab/`, so reruns only spend generations on sprites you delete or `--force`. Cost about 2 generations per sprite; 42 used in total.
+- Redone once: Stag Beetle (first try had deer antlers), Blightgrub, Ironshell Snail (shell wasn't metal), Toad Brute (was facing the camera). Wasp and Stag are mirrored because PixelLab drew them facing left.
+- Sheet and screenshot: `heartseed/art/sprite-sheet-pixellab.png`, `in-game-pixellab.png`.
+
+## 2026-11-17 (Pixel art v1, PR #4)
+- **Hand-made art first:** PixelLab is still blocked from cloud threads (api.pixellab.ai refused by the network). Tyler set up an environment on 2026-11-17; it only applies to threads started after it, and needs the API key as an environment variable.
+- 17 sprites drawn in code (`scripts/art/`, `npm run art`), 2 frames each, side profile facing right, one shared palette, shown at 2x with crisp pixels. Units flip to face where they walk. Missing sprites fall back to greybox shapes.
+- PixelLab art can replace `src/art/<name>.png` later (2-frame horizontal strip; frame size in `src/art/index.ts`).
+- Sheet and screenshot: `heartseed/art/`.
+
 ## 2026-11-16 (Phase 2 step 3: spells, quests, Nectar packs, mini-boss)
 - **Packs open during the run again (Tyler's original ask, confirmed 2026-11-16).** Kills drop Nectar (1 each). The "Open a pack" button (or Space) spends it on a Meadow Pack mid-fight; the game pauses while you flip the card. Price starts at 5 and grows x1.5 per pack that run (5, 8, 11, 17, 25...). The gold Market between runs stays: gold builds your starting team, Nectar grows it mid-run. `nectar.enabled` in tuning.json turns it off.
 - **Spells:** Silk Storm (web everything 5 s), Rain of Embers (burn everything, ignites up to 3 webs into Wildfire), Rally Pheromone (Swarm helpers and the Stinger +50% speed for 8 s; Stinger added so the card is never dead). About 1 card in 6 is a spell. 2 spell slots, keys 1 and 2 or click. Duplicates add stars (longer effect, faster recharge). Spells last one run, like helpers.
