@@ -6,6 +6,7 @@ import { MetaStats, bump, openPack, variantDamage } from '../meta/meta';
 import type { Loadout } from '../meta/run';
 import type { SaveData } from '../meta/save';
 import type { Reveal } from '../ui/reveal';
+import { addArt, loadArt, makeAnims } from '../art';
 
 export const W = 1280;
 export const H = 720;
@@ -68,6 +69,7 @@ export class BattleScene extends Phaser.Scene {
   stingerCooldown = 0;
   reticle!: Phaser.GameObjects.Arc;
   seedBody!: Phaser.GameObjects.Arc;
+  seedSprite!: Phaser.GameObjects.Sprite;
   hud!: Phaser.GameObjects.Text;
   seedBar!: Phaser.GameObjects.Graphics;
   banner!: Phaser.GameObjects.Text;
@@ -82,7 +84,10 @@ export class BattleScene extends Phaser.Scene {
     this.onEnd = data.onEnd ?? (() => {});
   }
 
+  preload() { loadArt(this); }
+
   create() {
+    makeAnims(this);
     const q = new URLSearchParams(location.search);
     this.maxHelpers = this.meta.maxHelpers;
     this.enemies = []; this.heroes = Array.from({ length: this.maxHelpers }, () => null);
@@ -108,8 +113,9 @@ export class BattleScene extends Phaser.Scene {
     this.add.rectangle(W / 2, H / 2, W, H, 0x23301c);
     this.add.circle(SEED.x, SEED.y, TUNING.heroLeash, 0x283522); // area helpers defend
     this.add.circle(SEED.x, SEED.y, 170, 0x2d3a22);
-    this.seedBody = this.add.circle(SEED.x, SEED.y, SEED.r, 0x9be36d).setStrokeStyle(4, 0x3f6e2a).setDepth(1);
-    this.add.text(SEED.x, SEED.y, 'SEED', { fontFamily: 'monospace', fontSize: '13px', color: '#1d3311' }).setOrigin(0.5).setDepth(1);
+    // The seed's footprint stays a circle (enemies stop at its edge); the sprite sits on top.
+    this.seedBody = this.add.circle(SEED.x, SEED.y, SEED.r, 0x1a2414, 0.6).setDepth(1);
+    this.seedSprite = addArt(this, 'heartseed', SEED.x, SEED.y - 10).setDepth(1.2);
 
     this.seedBar = this.add.graphics().setDepth(9);
     this.bossBar = this.add.graphics().setDepth(9);
@@ -213,6 +219,8 @@ export class BattleScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.buyPack());
     this.packLabel = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
     this.packBox.setVisible(TUNING.nectar.enabled); this.packLabel.setVisible(TUNING.nectar.enabled);
+    // Meadow Pack sprite peeking over the button's left edge.
+    this.add.sprite(x - 8, y + BTN.h / 2 - 4, 'pack_meadow', 0).setScale(1.5).setAngle(-12).setDepth(12).setVisible(TUNING.nectar.enabled).play('pack_meadow-idle');
   }
 
   /** Spend Nectar on a pack. The fight pauses while you flip the cards. */
@@ -592,7 +600,8 @@ export class BattleScene extends Phaser.Scene {
 
     this.seedHp = Math.min(this.maxSeedHp, this.seedHp + this.meta.seedRegen * dt);
     if (this.seedHp <= 0) { this.seedHp = 0; this.end('lost'); }
-    this.seedBody.setFillStyle(this.enemies.some(e => e.atSeed) && Math.sin(this.time_ * 20) > 0 ? 0xd9f0c8 : 0x9be36d);
+    if (this.enemies.some(e => e.atSeed) && Math.sin(this.time_ * 20) > 0) this.seedSprite.setTint(0xff9b9b);
+    else this.seedSprite.clearTint();
   }
 
   drawHud() {
