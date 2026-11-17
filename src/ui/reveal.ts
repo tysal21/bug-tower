@@ -38,8 +38,10 @@ export class Reveal {
   get active() { return this.queue.length > 0; }
 
   /** Queues cards to reveal one by one. onDone runs when the last one has been dealt with. */
-  show(pulls: Pull[], loadout: Loadout, stats: () => MetaStats, onDone: () => void) {
+  show(pulls: Pull[], loadout: Loadout, stats: () => MetaStats, onDone: () => void, live = false) {
     if (!pulls.length) return;
+    // Live = opened mid-fight: a see-through backdrop so you can watch the battle in slow motion.
+    this.root.classList.toggle('live', live);
     this.loadout = loadout; this.stats = stats; this.onDone = onDone;
     const wasActive = this.active;
     this.queue.push(...pulls);

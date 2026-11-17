@@ -4,7 +4,10 @@ import { HEROES, HERO_IDS, HeroDef, SPELL_IDS, TUNING } from '../game/data';
 import { SaveData, Variant } from './save';
 
 export type Rarity = HeroDef['rarity'];
-export interface ShopItem { name: string; cost: number; packs: number; packType: string; weight: number; requires?: string }
+export interface ShopItem {
+  name: string; cost: number; packs: number; packType: string; weight: number;
+  requiresIncome?: number; requiresBossKills?: number; bonusNectar?: number;
+}
 export interface TreeNode {
   branch: string; name: string; desc: string; icon: string; cost: number[]; effect: Record<string, number>;
   parent?: string; hero?: string; tier?: 'early' | 'core' | 'late';
@@ -47,18 +50,19 @@ export interface MetaStats {
   combs: number; hatchSpeed: number; twinChance: number; jellyChance: number;
   rarityBoost: number; legendaryBoost: number; foilChance: number; holoChance: number;
   maxHelpers: number; nectarMult: number; spellHaste: number; wildfireRadius: number; stingerWebBonus: number; antStart: number;
+  hatchery: number; startPacks: number;
   heroDmg: Record<string, number>; // extra damage per hero from Legends nodes
 }
 
 export function metaStats(save: SaveData): MetaStats {
   const s: MetaStats = {
-    maxGold: 1, freeRerolls: 0, offerSlots: SHOP.offerSlots, seedHpMult: 1, masteryMult: 1,
+    maxGold: TUNING.startCoins, freeRerolls: 0, offerSlots: SHOP.offerSlots, seedHpMult: 1, masteryMult: 1,
     stingerDmgMult: 1, stingerSpeedMult: 1, stingerRadiusMult: 1,
     helperSpeedMult: 1, commonDmg: 0, webSec: 0, webSlow: 0, burnMult: 1, swarmPerAlly: 0, heroDmg: {},
     bonusCardChance: 0, critChance: 0, bounces: 0, healPerKill: 0, seedRegen: 0, bossVuln: 0,
     combs: 0, hatchSpeed: 0, twinChance: 0, jellyChance: 0,
     rarityBoost: 0, legendaryBoost: 0, foilChance: SHOP.variants.foil.chance, holoChance: SHOP.variants.holo.chance,
-    maxHelpers: TUNING.maxHelpers, nectarMult: 1, spellHaste: 0, wildfireRadius: 0, stingerWebBonus: 0, antStart: 0,
+    maxHelpers: TUNING.maxHelpers, nectarMult: 1, spellHaste: 0, wildfireRadius: 0, stingerWebBonus: 0, antStart: 0, hatchery: 0, startPacks: 0,
   };
   const add = (effect: Record<string, number>, times: number) => {
     for (const [k, v] of Object.entries(effect)) (s as unknown as Record<string, number>)[k] += v * times;
@@ -106,8 +110,11 @@ export function nodeUnlocked(save: SaveData, id: string) {
 }
 
 export function itemUnlocked(save: SaveData, id: string) {
-  const req = SHOP.items[id].requires;
-  return !req || (save.nodes[req] ?? 0) > 0;
+  const it = SHOP.items[id];
+  // Bigger buys unlock by milestones: boxes once you earn 5 coins a visit, Grove Packs once the Frog King falls.
+  if (it.requiresIncome && metaStats(save).maxGold < it.requiresIncome) return false;
+  if (it.requiresBossKills && save.bossKills < it.requiresBossKills) return false;
+  return true;
 }
 
 /** Fills the shop slots with random unlocked items. */
@@ -138,8 +145,8 @@ export function packOdds(packType: string, m: MetaStats): Record<Rarity, number>
 const RARITY_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 
 /** One card from a pack of the given type, with its variant. minRarity is used by the pity rule. */
-export function rollCard(packType: string, m: MetaStats, minRarity?: Rarity): Pull {
-  if (!minRarity && Math.random() < TUNING.spells.chancePerCard) {
+export function rollCard(packType: string, m: MetaStats, minRarity?: Rarity, heroOnly = false): Pull {
+  if (!minRarity && !heroOnly && Math.random() < TUNING.spells.chancePerCard) {
     return { id: SPELL_IDS[Math.floor(Math.random() * SPELL_IDS.length)], variant: 'standard', kind: 'spell' };
   }
   const odds = packOdds(packType, m);
@@ -160,9 +167,10 @@ const isBig = (p: Pull) => p.kind === 'hero' && RARITY_ORDER.indexOf(HEROES[p.id
  * All the cards in one pack (Lucky Rip can add a bonus card).
  * Pity: after a dry streak with nothing Epic or better, the pack's card is guaranteed Epic+.
  */
-export function openPack(packType: string, m: MetaStats, save: SaveData): Pull[] {
+export function openPack(packType: string, m: MetaStats, save: SaveData, heroOnly = false): Pull[] {
   const pity = save.pity >= TUNING.pity.packsWithoutEpic;
-  const cards = [rollCard(packType, m, pity ? 'epic' : undefined)];
+  // heroOnly: with no helpers yet, the pack's main card is always a helper, never a spell.
+  const cards = [rollCard(packType, m, pity ? 'epic' : undefined, heroOnly)];
   if (Math.random() < m.bonusCardChance) cards.push(rollCard(packType, m));
   save.pity = cards.some(isBig) ? 0 : save.pity + 1;
   return cards;
@@ -205,5 +213,6 @@ export function refundAll(save: SaveData) {
 
 /** Mastery earned from a run. */
 export function masteryFor(kills: number, seconds: number, bossKilled: boolean, mult: number, miniBosses = 0) {
-  return Math.round((kills * 0.5 + seconds / 10 + miniBosses * TUNING.miniBoss.mastery + (bossKilled ? 100 : 0)) * mult);
+  const m = TUNING.mastery;
+  return Math.round((kills * m.perKill + seconds * m.perSec + miniBosses * TUNING.miniBoss.mastery + (bossKilled ? m.boss : 0)) * mult);
 }

@@ -17,9 +17,9 @@ Tech: TypeScript + Phaser, built with Vite.
 ## How to play
 
 - Hold the mouse on enemies to Sting them. Webbed enemies take +50%.
-- Kills drop Nectar. Press Space (or the button bottom right) to open a pack in the middle of the fight.
+- Kills drop Nectar. Press Space (or the button bottom right) to open a pack in the middle of the fight. The fight keeps going in slow motion while you flip, so rip fast. The Hatchery upgrade drops free sealed packs during a run.
 - Spells sit bottom left. Cast them with 1 and 2.
-- When the Heartseed falls you go to the Market: spend gold on packs for your next team and Mastery on the skill tree, then press Battle.
+- When the Heartseed falls you go to the Market: spend coins on packs (3 per visit to start) for your next team and Mastery on the skill tree, then press Battle.
 
 Useful extras: add `?speed=3` to the address to run the game 3x faster, `?test` to swap helpers by clicking them, `?boss` to skip to 5 seconds before the Frog King, `?at=95` to start 95 seconds in, or `?nectar=50` to start with Nectar.
 

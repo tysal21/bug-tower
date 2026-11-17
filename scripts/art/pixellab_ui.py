@@ -98,6 +98,8 @@ ICONS = {
     'sapFlow': 'a green drop of tree sap',
     'regrowth': 'a sprouting green seedling',
     'chant': 'a musical note made of leaves',
+    'hatchery': 'a small woven twig nest holding a glowing egg',
+    'clutch': 'a little wicker basket full of insect eggs',
     'silkstorm': 'a swirl of white spider silk',
     'embers': 'falling glowing embers and fire',
     'rally': 'a curling pheromone scent trail, golden swirl',

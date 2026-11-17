@@ -5,7 +5,11 @@ import type { Variant } from './save';
 
 export interface TeamMember { id: string; copies: number; stars: number; variant?: Variant }
 export interface SpellSlot { id: string; copies: number; stars: number }
-export interface Loadout { team: TeamMember[]; spells: SpellSlot[] }
+export interface Loadout {
+  team: TeamMember[]; spells: SpellSlot[];
+  /** Nectar you start the run with (bonus from Meadow Boxes). */
+  nectar?: number;
+}
 
 export function starsFor(copies: number) {
   let stars = 0;
