@@ -16,12 +16,17 @@ export interface SaveData {
   counters: Record<string, number>; // quest counters, e.g. packs, wildfires, "pull:ant"
   questsDone: string[]; // quest nodes already finished (so each one is announced once)
   pity: number; // packs opened in a row with nothing Epic or better
+  chapter: number; // current chapter, counted across acts (1, 2, 3 = Act I; 4, 5, 6 = Act II ...)
+  act: number; // current act (1-based)
+  actPending: boolean; // beat the act's last boss: the next menu must start the next act
+  heartwood: number; // permanent meta-currency kept through act resets
+  bestWave: number;
 }
 
 export function freshSave(): SaveData {
   return {
     mastery: 0, nodes: {}, runs: 0, bestTime: 0, bossKills: 0, pulled: [], variants: {}, spellsPulled: [], combs: [],
-    counters: {}, questsDone: [], pity: 0,
+    counters: {}, questsDone: [], pity: 0, chapter: 1, act: 1, actPending: false, heartwood: 0, bestWave: 0,
   };
 }
 

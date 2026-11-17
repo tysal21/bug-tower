@@ -1,5 +1,5 @@
 {
-  "seedHp": 180,
+  "seedHp": 150,
   "stinger": {
     "damage": 5,
     "attacksPerSec": 4,
@@ -26,13 +26,13 @@
   "maxHelpers": 6,
   "heroLeash": 330,
   "run": {
-    "note": "Enemies spawn non-stop and ramp up until bossAtSec, then the Frog King arrives. Surges are short bursts that feel like waves.",
-    "bossAtSec": 300,
+    "note": "Enemies spawn non-stop and ramp up until bossAtSec, then the Frog King arrives. Every surgeEverySec a surge lands and the wave counter goes up. openingRush = enemies dropped close to the seed at the start of the very first run, so that Stinger-only run falls within seconds and the upgrade loop opens straight away.",
+    "bossAtSec": 240,
     "spawnPerSecStart": 1.2,
     "spawnPerSecEnd": 2.5,
     "hpGrowthPerMin": 0.1,
-    "surgeEverySec": 60,
-    "surgeSize": 8,
+    "surgeEverySec": 30,
+    "surgeSize": 5,
     "spawnRateDuringBoss": 0.5,
     "mix": [
       {
@@ -47,19 +47,24 @@
       },
       {
         "enemy": "snail",
-        "fromSec": 90,
+        "fromSec": 75,
         "weight": 2
       },
       {
         "enemy": "wisp",
-        "fromSec": 140,
+        "fromSec": 120,
         "weight": 2
       }
     ],
     "miniBossAtSec": [
-      100,
-      200
-    ]
+      90,
+      170
+    ],
+    "openingRush": {
+      "count": 16,
+      "radius": 240,
+      "firstRunOnly": true
+    }
   },
   "boss": {
     "tongueEverySec": 7,
@@ -81,13 +86,14 @@
     "starHaste": 0.85
   },
   "nectar": {
-    "note": "Nectar drops from kills and buys Meadow Packs in the middle of a run. The price grows with every pack bought that run. Set enabled to false to turn mid-run packs off.",
+    "note": "Nectar drops from kills and buys Meadow Packs in the middle of a run, once the Honey Trade node is bought. The price grows with every pack bought that run. Set enabled to false to turn Nectar off entirely.",
     "enabled": true,
     "perKill": 1,
     "packPrice": 5,
     "priceGrowth": 1.5,
     "packType": "meadow",
-    "miniBossBounty": 15
+    "miniBossBounty": 15,
+    "requires": "honeyTrade"
   },
   "pity": {
     "note": "After this many packs in a row with nothing Epic or better, the next card is Epic or better.",
@@ -97,7 +103,51 @@
     "enemy": "toad",
     "eatEverySec": 5,
     "eatRange": 150,
-    "healFrac": 0.15,
-    "mastery": 5
+    "healFrac": 0.15
+  },
+  "midRun": {
+    "note": "Packs opened during a fight. pause false = the fight keeps going while you flip cards, so ripping fast matters. Field combs (Brood branch) hatch a free pack every combSec seconds of battle; unopened packs pile up to pileCap.",
+    "pause": false,
+    "combSec": 40,
+    "pileCap": 6,
+    "packType": "meadow"
+  },
+  "mastery": {
+    "note": "Mastery earned per run (before Harvest and Heartwood bonuses).",
+    "perKill": 1,
+    "perSec": 0.2,
+    "miniBoss": 5,
+    "boss": 60
+  },
+  "chapters": {
+    "note": "Each Frog King you beat moves you to the next chapter. Inside an act, each chapter adds hpPerChapter enemy health and spawnPerChapter spawn rate. After perAct chapters you must start the next Act: the skill tree and Mastery reset and you keep Heartwood (1 per heartwoodPer Mastery you had invested). Each Heartwood gives +heartwoodMastery Mastery from runs, forever.",
+    "perAct": 3,
+    "hpPerChapter": 0.3,
+    "spawnPerChapter": 0.12,
+    "heartwoodPer": 100,
+    "heartwoodMastery": 0.05,
+    "acts": [
+      {
+        "name": "Act I",
+        "hpMult": 1,
+        "armor": 0,
+        "speedMult": 1,
+        "mechanic": ""
+      },
+      {
+        "name": "Act II",
+        "hpMult": 1.6,
+        "armor": 0.2,
+        "speedMult": 1,
+        "mechanic": "Blight-hardened shells: every enemy shrugs off 20% more physical damage"
+      },
+      {
+        "name": "Act III",
+        "hpMult": 2.4,
+        "armor": 0.2,
+        "speedMult": 1.2,
+        "mechanic": "Blight-hardened shells, and the swarm moves 20% faster"
+      }
+    ]
   }
 }

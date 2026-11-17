@@ -3,7 +3,8 @@ import { BattleScene, W, H, RunResult } from './scenes/BattleScene';
 import { Menu } from './ui/menu';
 import { Reveal } from './ui/reveal';
 import { loadSave, writeSave } from './meta/save';
-import { metaStats, masteryFor } from './meta/meta';
+import { metaStats, masteryFor, bossBeaten, TREE, SHOP, nodeUnlocked } from './meta/meta';
+import { pullFate } from './meta/run';
 import type { Loadout } from './meta/run';
 
 const save = loadSave();
@@ -23,11 +24,13 @@ function startRun(loadout: Loadout) {
 }
 
 function endRun(r: RunResult) {
-  const mastery = masteryFor(r.kills, r.seconds, r.won, metaStats(save).masteryMult, r.miniBosses);
+  const m = metaStats(save);
+  const mastery = masteryFor(r.kills, r.seconds, r.won, m.masteryMult * m.heartwoodMult, r.miniBosses);
   save.mastery += mastery;
   save.runs++;
   save.bestTime = Math.max(save.bestTime, r.seconds);
-  if (r.won) save.bossKills++;
+  save.bestWave = Math.max(save.bestWave, r.wave);
+  if (r.won) { save.bossKills++; bossBeaten(save); }
   writeSave(save);
   game.scene.pause('battle');
   menu.open({ ...r, mastery });
@@ -36,6 +39,8 @@ function endRun(r: RunResult) {
 const menu = new Menu(save, reveal, startRun);
 (window as unknown as { __menu: Menu; __save: typeof save }).__menu = menu;
 (window as unknown as { __save: typeof save }).__save = save;
+// Handles for the progression bot (tools/bot.mjs).
+Object.assign(window, { __TREE: TREE, __SHOP: SHOP, __nodeUnlocked: nodeUnlocked, __pullFate: pullFate });
 
 // The very first run starts straight away with only the Stinger. After that, start at the menu.
 game.events.once('ready', () => {

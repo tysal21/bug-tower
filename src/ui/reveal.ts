@@ -63,6 +63,15 @@ export class Reveal {
     if (actions) actions.hidden = false;
   }
 
+  /** Drops any cards still waiting (the run ended mid-flip). */
+  cancel() {
+    if (!this.active) return;
+    this.queue = [];
+    this.flipped = false;
+    this.root.hidden = true;
+    this.root.innerHTML = '';
+  }
+
   private take(replaceIndex?: number) {
     addPull(this.loadout, this.queue[0], this.stats(), replaceIndex);
     this.next();

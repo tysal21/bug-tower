@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ENEMIES, HEROES, HERO_IDS, SPELLS, TUNING, DamageType, TAG_COLOR } from '../game/data';
 import { Enemy } from '../game/Enemy';
 import { Hero } from '../game/Hero';
-import { MetaStats, bump, openPack, variantDamage } from '../meta/meta';
+import { MetaStats, actDef, bump, chapterInAct, openPack, variantDamage } from '../meta/meta';
 import type { Loadout } from '../meta/run';
 import type { SaveData } from '../meta/save';
 import type { Reveal } from '../ui/reveal';
@@ -17,7 +17,7 @@ function homeFor(i: number, slots: number) {
   return { x: SEED.x + Math.cos(a) * r, y: SEED.y + Math.sin(a) * r };
 }
 
-export interface RunResult { won: boolean; seconds: number; kills: number; miniBosses: number; quests: string[] }
+export interface RunResult { won: boolean; seconds: number; kills: number; miniBosses: number; quests: string[]; wave: number }
 export interface RunSetup { loadout: Loadout; meta: MetaStats; save: SaveData; reveal: Reveal; onEnd?: (r: RunResult) => void }
 
 interface SpellButton { id: string; box: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text }
@@ -49,6 +49,12 @@ export class BattleScene extends Phaser.Scene {
   maxHelpers = TUNING.maxHelpers;
   nectar = 0;
   packsBought = 0;
+  packPile = 0; // free packs hatched by field combs, waiting to be ripped open
+  combTimers: number[] = []; // seconds of battle until each field comb hatches
+  combGfx: Phaser.GameObjects.Graphics | null = null;
+  hpMult = 1; // chapter + act enemy health
+  spawnMult = 1; // chapter spawn rate
+  armorBonus = 0; // act: extra armor on every enemy
   packLock = 0;
   miniIdx = 0; // next mini-boss in tuning.run.miniBossAtSec
   questsDone: string[] = [];
@@ -103,11 +109,20 @@ export class BattleScene extends Phaser.Scene {
     if (q.has('at')) this.time_ = Number(q.get('at')) || 0;
     this.miniIdx = TUNING.run.miniBossAtSec.filter(t => t < this.time_).length;
     if (q.has('nectar')) this.nectar = Number(q.get('nectar')) || 0;
+    // Chapter and act difficulty.
+    const ch = TUNING.chapters, act = actDef(this.save.act), inAct = chapterInAct(this.save) - 1;
+    this.hpMult = (1 + ch.hpPerChapter * inAct) * act.hpMult;
+    this.spawnMult = 1 + ch.spawnPerChapter * inAct;
+    this.armorBonus = act.armor;
+    Enemy.actSpeed = act.speedMult;
+    this.packPile = 0;
+    this.combTimers = Array.from({ length: this.meta.fieldCombs }, (_, i) => this.combSec * (1 + i / Math.max(1, this.meta.fieldCombs)));
 
     // Ground: a top-down meadow with a worn circle around the seed.
     this.add.rectangle(W / 2, H / 2, W, H, 0x23301c);
     this.add.circle(SEED.x, SEED.y, TUNING.heroLeash, 0x283522); // area helpers defend
     this.add.circle(SEED.x, SEED.y, 170, 0x2d3a22);
+    this.combGfx = this.add.graphics().setDepth(1);
     this.seedBody = this.add.circle(SEED.x, SEED.y, SEED.r, 0x9be36d).setStrokeStyle(4, 0x3f6e2a).setDepth(1);
     this.add.text(SEED.x, SEED.y, 'SEED', { fontFamily: 'monospace', fontSize: '13px', color: '#1d3311' }).setOrigin(0.5).setDepth(1);
 
@@ -138,7 +153,12 @@ export class BattleScene extends Phaser.Scene {
     // Bring in the team bought in the shop.
     this.syncTeam();
     this.drawHud();
-    this.showBanner(this.loadout.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!');
+    const where = `${act.name} · Chapter ${this.save.chapter}`;
+    this.showBanner(`${where}\n${this.loadout.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!'}`);
+    if (act.mechanic) this.time.delayedCall(1800, () => this.state === 'playing' && this.showBanner(act.mechanic));
+    // The opening rush on the very first run: grubs dropped close to the seed. With only the Stinger, the run ends in seconds.
+    const rush = TUNING.run.openingRush;
+    if (this.time_ === 0 && (!rush.firstRunOnly || this.save.runs === 0)) for (let i = 0; i < TUNING.run.openingRush.count; i++) this.spawn('grub', TUNING.run.openingRush.radius);
   }
 
   /** Makes the helpers and spell buttons on the field match the loadout (after the shop, and after each mid-run pack). */
@@ -204,7 +224,26 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  // ---------- Nectar and mid-run packs ----------
+  // ---------- mid-run packs: field combs and Nectar ----------
+  get combSec() { return TUNING.midRun.combSec / (1 + this.meta.hatchSpeed); }
+  get nectarOn() { return TUNING.nectar.enabled && this.meta.honey > 0; }
+  get packsOn() { return this.nectarOn || this.meta.fieldCombs > 0; }
+
+  /** Field combs fill while you fight and drop free packs on the pile. */
+  updateCombs(dt: number) {
+    const g = this.combGfx!;
+    g.clear();
+    this.combTimers.forEach((left, i) => {
+      if (this.packPile < TUNING.midRun.pileCap) left -= dt;
+      if (left <= 0) { left += this.combSec; this.packPile++; this.floatText(SEED.x, SEED.y + 60, '🪺 Pack hatched! [Space]', '#ffb84d'); }
+      this.combTimers[i] = left;
+      const a = Math.PI / 2 + (i - (this.combTimers.length - 1) / 2) * 0.5, x = SEED.x + Math.cos(a) * 62, y = SEED.y + Math.sin(a) * 62;
+      g.fillStyle(0x3a2a10, 0.9).fillCircle(x, y, 11);
+      g.fillStyle(0xffb84d, 0.95).slice(x, y, 11, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - left / this.combSec), false).fillPath();
+      g.lineStyle(2, 0xffb84d, 1).strokeCircle(x, y, 11);
+    });
+  }
+
   get packPrice() { return Math.round(TUNING.nectar.packPrice * Math.pow(TUNING.nectar.priceGrowth, this.packsBought)); }
 
   buildPackButton() {
@@ -212,17 +251,23 @@ export class BattleScene extends Phaser.Scene {
     this.packBox = this.add.rectangle(x, y, BTN.w, BTN.h, 0x241f14, 0.92).setOrigin(0).setStrokeStyle(2, 0xf2c94c).setDepth(10)
       .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.buyPack());
     this.packLabel = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
-    this.packBox.setVisible(TUNING.nectar.enabled); this.packLabel.setVisible(TUNING.nectar.enabled);
+    this.packBox.setVisible(this.packsOn); this.packLabel.setVisible(this.packsOn);
   }
 
-  /** Spend Nectar on a pack. The fight pauses while you flip the cards. */
+  /**
+   * Rips open a pack from the field-comb pile, or buys one with Nectar.
+   * The fight keeps going while you flip it (midRun.pause in tuning.json brings back the old pause).
+   */
   buyPack() {
-    if (!TUNING.nectar.enabled || this.paused || performance.now() < this.packLock || this.state !== 'playing' || this.nectar < this.packPrice) return;
-    this.nectar -= this.packPrice;
-    this.packsBought++; this.stats.packs++;
-    this.paused = true;
+    if (!this.packsOn || this.paused || this.reveal.active || performance.now() < this.packLock || this.state !== 'playing') return;
+    let type: string;
+    if (this.packPile > 0) { this.packPile--; type = TUNING.midRun.packType; }
+    else if (this.nectarOn && this.nectar >= this.packPrice) { this.nectar -= this.packPrice; this.packsBought++; type = TUNING.nectar.packType; }
+    else return;
+    this.stats.packs++;
+    if (TUNING.midRun.pause) this.paused = true;
     this.uiPress = true; // don't sting with the press that bought the pack
-    const cards = openPack(TUNING.nectar.packType, this.meta, this.save);
+    const cards = openPack(type, this.meta, this.save);
     this.quests(bump(this.save, 'packs'));
     this.reveal.show(cards, this.loadout, () => this.meta, () => {
       this.quests(this.reveal.questNews.splice(0));
@@ -400,7 +445,8 @@ export class BattleScene extends Phaser.Scene {
     if (!e.alive) return;
     if (type === 'physical') {
       if (e.def.physicalImmune) { if (showNumber) this.floatText(e.x, e.y - 20, 'IMMUNE', '#b07cff'); return; }
-      const armor = e.sundered ? e.def.armor * (1 - TUNING.sunderArmorCut) : e.def.armor;
+      const base = Math.min(0.9, e.def.armor + this.armorBonus);
+      const armor = e.sundered ? base * (1 - TUNING.sunderArmorCut) : base;
       amount *= 1 - armor;
     }
     if (e.def.boss) amount *= 1 + this.meta.bossVuln;
@@ -412,11 +458,11 @@ export class BattleScene extends Phaser.Scene {
   kill(e: Enemy) {
     if (!e.alive) return;
     this.stats.kills++;
-    this.nectar += TUNING.nectar.perKill * this.meta.nectarMult;
+    if (this.nectarOn) this.nectar += TUNING.nectar.perKill * this.meta.nectarMult;
     if (e.def.miniBoss) {
       this.stats.miniBosses++;
-      this.nectar += TUNING.nectar.miniBossBounty;
-      this.floatText(e.x, e.y - 40, `Toad Brute down! +${TUNING.nectar.miniBossBounty} Nectar`, '#ffd76e');
+      if (this.nectarOn) this.nectar += TUNING.nectar.miniBossBounty;
+      this.floatText(e.x, e.y - 40, this.nectarOn ? `Toad Brute down! +${TUNING.nectar.miniBossBounty} Nectar` : 'Toad Brute down!', '#ffd76e');
     }
     this.seedHp = Math.min(this.maxSeedHp, this.seedHp + this.meta.healPerKill);
     e.destroy();
@@ -452,17 +498,18 @@ export class BattleScene extends Phaser.Scene {
     return 'grub';
   }
 
-  /** Spawns just outside a random point on the screen edge. */
-  spawn(enemy: string) {
+  /** Spawns just outside a random point on the screen edge (or on a ring this far from the seed). */
+  spawn(enemy: string, radius?: number) {
     const def = ENEMIES[enemy];
     const m = 30 + def.size;
     let t = Math.random() * 2 * (W + H);
     let x: number, y: number;
-    if (t < W) { x = t; y = -m; }
+    if (radius) { const a = Math.random() * Math.PI * 2; x = SEED.x + Math.cos(a) * radius; y = SEED.y + Math.sin(a) * radius; }
+    else if (t < W) { x = t; y = -m; }
     else if ((t -= W) < H) { x = W + m; y = t; }
     else if ((t -= H) < W) { x = W - t; y = H + m; }
     else { t -= W; x = -m; y = H - t; }
-    const hpScale = def.boss ? 1 : 1 + TUNING.run.hpGrowthPerMin * (this.time_ / 60);
+    const hpScale = this.hpMult * (def.boss ? 1 : 1 + TUNING.run.hpGrowthPerMin * (this.time_ / 60));
     const e = new Enemy(this, enemy, def, x, y, SEED.x, SEED.y, SEED.r, hpScale);
     this.enemies.push(e);
     return e;
@@ -471,13 +518,13 @@ export class BattleScene extends Phaser.Scene {
   updateSpawns(dt: number) {
     const run = TUNING.run;
     const progress = Math.min(1, this.time_ / run.bossAtSec);
-    let rate = run.spawnPerSecStart + (run.spawnPerSecEnd - run.spawnPerSecStart) * progress;
+    let rate = (run.spawnPerSecStart + (run.spawnPerSecEnd - run.spawnPerSecStart) * progress) * this.spawnMult;
     if (this.bossSpawned) rate *= run.spawnRateDuringBoss;
     this.spawnDebt += rate * dt;
     while (this.spawnDebt >= 1) { this.spawnDebt--; this.spawn(this.pickEnemy()); }
     if (!this.bossSpawned && this.time_ >= this.nextSurge) {
       this.nextSurge += run.surgeEverySec;
-      this.showBanner('Swarm incoming!');
+      this.showBanner(`Wave ${this.wave}!`);
       for (let i = 0; i < run.surgeSize; i++) this.spawn(this.pickEnemy());
     }
     if (!this.bossSpawned && this.time_ >= (run.miniBossAtSec[this.miniIdx] ?? Infinity)) {
@@ -558,11 +605,12 @@ export class BattleScene extends Phaser.Scene {
     if (this.state !== 'playing') return;
     this.state = result;
     this.stingerDown = false;
+    this.reveal.cancel(); // a pack still being flipped when the run ends is lost
     if (result === 'won') this.quests(bump(this.save, 'bossKills'));
     this.banner.setText(result === 'won' ? 'The Heartseed survives!' : 'The Heartseed has fallen').setFontSize(36).setAlpha(1);
     // Short pause so you see what happened, then the menu takes over.
     this.time.delayedCall(1400, () => this.onEnd({
-      won: result === 'won', seconds: Math.round(this.time_), kills: this.stats.kills, miniBosses: this.stats.miniBosses, quests: this.questsDone,
+      won: result === 'won', seconds: Math.round(this.time_), kills: this.stats.kills, miniBosses: this.stats.miniBosses, quests: this.questsDone, wave: this.wave,
     }));
   }
 
@@ -581,6 +629,7 @@ export class BattleScene extends Phaser.Scene {
     this.drawSpells(dt);
     this.updateHeroes(dt);
     this.updateTraps();
+    this.updateCombs(dt);
 
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -595,14 +644,18 @@ export class BattleScene extends Phaser.Scene {
     this.seedBody.setFillStyle(this.enemies.some(e => e.atSeed) && Math.sin(this.time_ * 20) > 0 ? 0xd9f0c8 : 0x9be36d);
   }
 
+  /** Waves are the surges: wave 1 until the first surge, then +1 each surge. */
+  get wave() { return 1 + Math.floor(Math.min(this.time_, TUNING.run.bossAtSec) / TUNING.run.surgeEverySec); }
+
   drawHud() {
     const left = TUNING.run.bossAtSec - this.time_;
     const timer = this.bossSpawned ? 'BOSS FIGHT' : `Boss in ${this.clock(left)}`;
-    const nectarOn = TUNING.nectar.enabled;
-    this.hud.setText(`${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}${nectarOn ? `   Nectar ${Math.floor(this.nectar)}` : ''}${this.rallying ? '   RALLY!' : ''}`);
-    if (nectarOn) {
-      const can = this.nectar >= this.packPrice;
-      this.packLabel.setText(`Open a pack [Space]\n${Math.floor(this.nectar)} / ${this.packPrice} Nectar`).setColor(can ? '#1b1405' : '#a59a84');
+    this.hud.setText(`Ch ${this.save?.chapter ?? 1}   Wave ${this.wave}   ${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}${this.nectarOn ? `   Nectar ${Math.floor(this.nectar)}` : ''}${this.rallying ? '   RALLY!' : ''}`);
+    if (this.packsOn) {
+      const pile = this.packPile > 0;
+      const can = pile || (this.nectarOn && this.nectar >= this.packPrice);
+      const sub = pile ? `${this.packPile} pack${this.packPile > 1 ? 's' : ''} waiting` : this.nectarOn ? `${Math.floor(this.nectar)} / ${this.packPrice} Nectar` : 'comb filling...';
+      this.packLabel.setText(`Rip a pack [Space]\n${sub}`).setColor(can ? '#1b1405' : '#a59a84');
       this.packBox.setFillStyle(can ? 0xf2c94c : 0x241f14, 0.92);
     }
     this.bossBar.clear();

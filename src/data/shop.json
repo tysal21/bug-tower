@@ -1,19 +1,80 @@
 {
-  "note": "Shop items between runs. packType picks the odds below. requires = skill tree node that unlocks it. weight = how often it shows up in a shop slot. variants: base chance a card is Foil/Holo and the damage bonus each gives. brood: minutes for a comb to hatch a free pack.",
+  "note": "Shop between runs. income = coins you get every shop visit before upgrades. packType picks the odds below. weight = how often it shows up in a random slot. guaranteed = always takes the first slot once unlocked. Unlocks: requiresIncome (your coins per visit), requiresChapter (beat the boss of the chapter before). bonusMastery = Mastery that comes with the item. variants: base chance a card is Foil/Holo and the damage bonus each gives. brood: minutes for a comb to hatch a free pack between runs.",
+  "income": 3,
   "offerSlots": 3,
   "rerollCost": 1,
   "items": {
-    "meadow": { "name": "Meadow Pack",   "cost": 1, "packs": 1, "packType": "meadow", "weight": 10 },
-    "box":    { "name": "Meadow Box",    "cost": 3, "packs": 4, "packType": "meadow", "weight": 4, "requires": "boxes" },
-    "grove":  { "name": "Grove Pack",    "cost": 2, "packs": 1, "packType": "grove",  "weight": 5, "requires": "grovePacks" }
+    "meadow": {
+      "name": "Meadow Pack",
+      "cost": 2,
+      "packs": 1,
+      "packType": "meadow",
+      "weight": 10
+    },
+    "box": {
+      "name": "Bundle Box",
+      "cost": 5,
+      "packs": 3,
+      "packType": "meadow",
+      "weight": 0,
+      "guaranteed": true,
+      "requiresIncome": 5,
+      "bonusMastery": 10
+    },
+    "grove": {
+      "name": "Grove Pack",
+      "cost": 5,
+      "packs": 1,
+      "packType": "grove",
+      "weight": 4,
+      "requiresChapter": 2
+    },
+    "elder": {
+      "name": "Elder Pack",
+      "cost": 9,
+      "packs": 1,
+      "packType": "elder",
+      "weight": 3,
+      "requiresChapter": 3
+    }
   },
   "packTypes": {
-    "meadow": { "odds": { "common": 70, "rare": 24, "epic": 5,  "legendary": 1 } },
-    "grove":  { "odds": { "common": 35, "rare": 45, "epic": 16, "legendary": 4 } }
+    "meadow": {
+      "odds": {
+        "common": 70,
+        "rare": 24,
+        "epic": 5,
+        "legendary": 1
+      }
+    },
+    "grove": {
+      "odds": {
+        "common": 0,
+        "rare": 70,
+        "epic": 25,
+        "legendary": 5
+      }
+    },
+    "elder": {
+      "odds": {
+        "common": 0,
+        "rare": 0,
+        "epic": 75,
+        "legendary": 25
+      }
+    }
   },
   "variants": {
-    "foil": { "chance": 0.05, "damage": 0.2 },
-    "holo": { "chance": 0.01, "damage": 0.45 }
+    "foil": {
+      "chance": 0.05,
+      "damage": 0.2
+    },
+    "holo": {
+      "chance": 0.01,
+      "damage": 0.45
+    }
   },
-  "brood": { "hatchMinutes": 4 }
+  "brood": {
+    "hatchMinutes": 4
+  }
 }

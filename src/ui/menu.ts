@@ -4,13 +4,14 @@ import { HEROES, HERO_IDS, SPELLS, SPELL_IDS, TUNING, TAG_COLOR } from '../game/
 import {
   SHOP, TREE, MetaStats, Pull, Rarity, metaStats, nodeUnlocked, refundAll, rollOffers, openPack, packOdds,
   syncCombs, combProgress, hatchComb, hatchMs, VARIANT_RANK, variantDamage, questDone, questProgress, bump,
+  actDef, heartwoodFor, beginNextAct, itemUnlocked, lastChapter,
 } from '../meta/meta';
 import type { Loadout } from '../meta/run';
 import { Reveal, VARIANT_LABEL } from './reveal';
 import { SaveData, Variant, writeSave, resetSave, freshSave } from '../meta/save';
 import { treeLayout, hexPoints } from './treeGraph';
 
-export interface RunSummary { seconds: number; kills: number; mastery: number; won: boolean; quests: string[] }
+export interface RunSummary { seconds: number; kills: number; mastery: number; won: boolean; quests: string[]; wave: number }
 
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -64,6 +65,7 @@ export class Menu {
     if (this.gold < item.cost) return;
     this.gold -= item.cost;
     this.offers[slot] = null;
+    if (item.bonusMastery) { this.save.mastery += item.bonusMastery; writeSave(this.save); }
     this.openPacks(Array.from({ length: item.packs }, () => item.packType));
   }
 
@@ -86,7 +88,9 @@ export class Menu {
   openPacks(types: string[]) {
     const cards: Pull[] = [];
     for (const t of types) cards.push(...openPack(t, this.m, this.save));
+    const before = this.m;
     this.questNews.push(...bump(this.save, 'packs', types.length));
+    this.applyShopChanges(before); // First Haul's +1 coin counts on this visit too
     writeSave(this.save);
     this.render();
     this.reveal.show(cards, this.loadout, () => this.m, () => {
@@ -104,14 +108,31 @@ export class Menu {
     const before = this.m;
     this.save.mastery -= cost;
     this.save.nodes[id] = rank + 1;
-    const after = this.m;
-    // Upgrades that touch the shop apply right away to this visit.
-    this.gold += after.maxGold - before.maxGold;
-    this.rerolls += after.freeRerolls - before.freeRerolls;
-    while (this.offers.length < after.offerSlots) this.offers.push(rollOffers(this.save)[0]);
-    syncCombs(this.save, after);
+    this.applyShopChanges(before);
+    syncCombs(this.save, this.m);
     writeSave(this.save);
     this.render();
+  }
+
+  /** Upgrades and quests that touch the shop apply right away to this visit. */
+  applyShopChanges(before: MetaStats) {
+    const after = this.m;
+    this.gold += after.maxGold - before.maxGold;
+    this.rerolls += after.freeRerolls - before.freeRerolls;
+    while (this.offers.length < after.offerSlots) this.offers.push(rollOffers(this.save, 1)[0]);
+    // Income just reached 5: the Bundle Box shows up in the first slot.
+    for (const id of Object.keys(SHOP.items)) {
+      if (!SHOP.items[id].guaranteed || itemUnlocked(this.save, id, before) || !itemUnlocked(this.save, id, after)) continue;
+      if (!this.offers.includes(id)) this.offers[0] = id;
+    }
+  }
+
+  /** Act transition: reset the tree for Heartwood, then back to the Market. */
+  startNextAct() {
+    beginNextAct(this.save);
+    writeSave(this.save);
+    this.selected = null;
+    this.open(this.summary);
   }
 
   // ---------- rendering ----------
@@ -123,12 +144,14 @@ export class Menu {
       <div class="screen">
         <header class="topbar">
           <h1>Heartseed</h1>
-          ${s ? `<p class="summary">${s.won ? 'You beat the Frog King!' : 'The Heartseed fell.'} Lasted <b>${clock(s.seconds)}</b> · ${s.kills} kills · <b class="mastery">+${s.mastery} Mastery</b></p>` : '<p class="summary muted">Spend gold on packs, Mastery on upgrades, then defend the seed.</p>'}
+          <p class="chapter">${actDef(this.save.act).name} · Chapter ${this.save.chapter}${this.save.heartwood ? ` · <span class="heartwood" title="Heartwood: kept through act resets. +${Math.round(TUNING.chapters.heartwoodMastery * 100)}% Mastery each">🪵 ${this.save.heartwood}</span>` : ''}</p>
+          ${s ? `<p class="summary">${s.won ? 'You beat the Frog King!' : 'The Heartseed fell.'} Lasted <b>${clock(s.seconds)}</b> · wave ${s.wave} · ${s.kills} kills · <b class="mastery">+${s.mastery} Mastery</b></p>` : '<p class="summary muted">Spend coins on packs, Mastery on upgrades, then defend the seed.</p>'}
           ${this.questNews.length ? `<p class="quest-news">📜 Quest complete: <b>${[...new Set(this.questNews)].join(', ')}</b></p>` : ''}
         </header>
         ${this.marketHtml()}
         ${this.progressHtml()}
-      </div>`;
+      </div>
+      ${this.save.actPending ? this.actHtml() : ''}`;
     const market = this.root.querySelector('.market');
     if (market) market.scrollTop = scroll;
     // On narrow screens the tree is wider than the panel: start it centred on the seed.
@@ -137,10 +160,23 @@ export class Menu {
     this.bind();
   }
 
+  actHtml() {
+    const next = this.save.act + 1;
+    const d = actDef(next);
+    const wood = heartwoodFor(this.save);
+    return `<div class="act-gate"><div class="act-card">
+      <h2>${actDef(this.save.act).name} complete!</h2>
+      <p>${d.name} begins. Your skill tree and Mastery reset, and you rebuild your economy from scratch against tougher enemies.</p>
+      ${d.mechanic ? `<p class="act-mech">⚠ ${d.mechanic}. Enemies also have ${Math.round((d.hpMult - 1) * 100)}% more health.</p>` : ''}
+      <p>You keep: <b>🪵 ${wood} Heartwood</b> (one per ${TUNING.chapters.heartwoodPer} Mastery you invested, +${Math.round(TUNING.chapters.heartwoodMastery * 100)}% Mastery each, forever), your quests, your collection and the packs you've unlocked.</p>
+      <button data-next-act>Begin ${d.name}</button>
+    </div></div>`;
+  }
+
   currencyHtml() {
     const pips = Array.from({ length: this.m.maxGold }, (_, i) => `<span class="pip ${i < this.gold ? 'full' : ''}"></span>`).join('');
     return `<div class="purse">
-      <span class="coin" title="Gold: refills to full every run">${pips}<b>${this.gold}</b></span>
+      <span class="coin" title="Coins: refill to full every shop visit">${pips}<b>${this.gold}</b></span>
       <span class="mastery" title="Mastery: earned in runs, spent in the skill tree">✦ <b>${this.save.mastery}</b></span>
     </div>`;
   }
@@ -152,18 +188,18 @@ export class Menu {
       if (!id) return `<div class="offer sold"><span>Sold</span></div>`;
       const it = SHOP.items[id];
       const can = this.gold >= it.cost;
-      const deal = it.packType === 'meadow' && it.packs > 1 ? `<span class="deal">save ${Math.round((1 - it.cost / (it.packs * meadowEach)) * 100)}%</span>` : '';
+      const deal = it.packType === 'meadow' && it.packs > 1 ? `<span class="deal">save ${Math.round((1 - it.cost / (it.packs * meadowEach)) * 100)}%${it.bonusMastery ? ` · +${it.bonusMastery} ✦` : ''}</span>` : '';
       const odds = packOdds(it.packType, m);
       return `<button class="offer ${it.packType} ${it.packs > 1 ? 'bundle' : ''}" data-buy="${i}" ${can ? '' : 'disabled'}
           title="Rare+ ${pct(100 - odds.common)} · Legendary ${pct(odds.legendary)}">
         <div class="pack-art">${it.packs > 1 ? '<i></i><i></i><i></i>' : '<i></i>'}</div>
         <div class="offer-name">${it.name}</div>
-        <div class="offer-sub">${it.packs > 1 ? `${it.packs} packs` : '1 pack'}${it.packType === 'grove' ? ' · rare odds' : ''} ${deal}</div>
+        <div class="offer-sub">${it.packs > 1 ? `${it.packs} packs` : '1 pack'}${it.packType === 'grove' ? ' · rare+ only' : it.packType === 'elder' ? ' · epic+ only' : ''} ${deal}</div>
         <div class="offer-odds">Rare+ ${pct(100 - odds.common)}</div>
         <span class="price">${it.cost} <span class="pip full"></span></span>
       </button>`;
     }).join('');
-    const rerollLabel = this.rerolls > 0 ? `↻ Reroll <small>free ×${this.rerolls}</small>` : `↻ Reroll <small>${SHOP.rerollCost} gold</small>`;
+    const rerollLabel = this.rerolls > 0 ? `↻ Reroll <small>free ×${this.rerolls}</small>` : `↻ Reroll <small>${SHOP.rerollCost} coin</small>`;
     const canReroll = this.rerolls > 0 || this.gold >= SHOP.rerollCost;
     const spells = Array.from({ length: TUNING.spells.slots }, (_, i) => {
       const sp = this.loadout.spells[i];
@@ -188,8 +224,19 @@ export class Menu {
         <div class="sub-head"><h3>Your team this run</h3><span class="muted small">lasts one run · duplicates add ★</span></div>
         <div class="team">${team}</div>
         <div class="team spells">${spells}</div>
-        <p class="muted small nectar-note">🍯 Kills drop Nectar. Spend it on more packs in the middle of a run.</p>
+        <p class="muted small nectar-note">${this.unlockHint(m)}</p>
       </section>`;
+  }
+
+  /** One line on what the shop unlocks next. */
+  unlockHint(m: MetaStats) {
+    const bits: string[] = [];
+    if (!questDone(this.save, 'qFirstHaul')) bits.push('📜 Open 2 packs for +1 coin every visit.');
+    const box = SHOP.items.box;
+    if (m.maxGold < (box.requiresIncome ?? 0)) bits.push(`📦 Bundle Box (3 packs for ${box.cost}) unlocks at ${box.requiresIncome} coins per visit.`);
+    if (this.save.chapter < 2) bits.push('🌳 Beat the Frog King to unlock Grove Packs.');
+    if (m.fieldCombs || m.honey) bits.push('🪺 In battle, press Space to rip open packs from your field combs' + (m.honey ? ' or Nectar.' : '.'));
+    return bits.join(' ');
   }
 
   combsHtml(m: MetaStats) {
@@ -234,7 +281,7 @@ export class Menu {
         ${this.tab === 'upgrades' ? this.treeHtml() : this.collectionHtml()}
         <footer class="progress-foot">
           ${this.tab === 'upgrades' ? this.detailHtml() : '<div></div>'}
-          <button class="battle" data-start>Battle<small>${this.loadoutLabel()}</small></button>
+          <button class="battle" data-start>Battle<small>Chapter ${this.save.chapter}${this.save.chapter >= lastChapter() ? ' (final)' : ''} · ${this.loadoutLabel()}</small></button>
         </footer>
       </section>`;
   }
@@ -374,7 +421,7 @@ export class Menu {
         }).join('')}</div>
         <h3>Your pull odds</h3>
         <table class="odds"><tr><th></th>${order.map(r => `<th class="r-${r}">${r}</th>`).join('')}</tr>
-          ${row('Meadow', 'meadow')}${row('Grove', 'grove')}</table>
+          ${row('Meadow', 'meadow')}${row('Grove', 'grove')}${row('Elder', 'elder')}</table>
         <p class="muted small">Any card: Foil ${pct(m.foilChance * 100)} · Holo ${pct(m.holoChance * 100)} · bonus card ${pct(m.bonusCardChance * 100)}. Raise these in the Fortune branch. About 1 card in ${Math.round(1 / TUNING.spells.chancePerCard)} is a spell. After ${TUNING.pity.packsWithoutEpic} packs with nothing Epic or better, the next one is guaranteed (you're at ${Math.min(this.save.pity, TUNING.pity.packsWithoutEpic)}).</p>
         <button class="link" data-reset>Reset all progress</button>
       </div>`;
@@ -389,6 +436,7 @@ export class Menu {
     q<HTMLElement>('[data-node]').forEach(b => b.onclick = () => { this.selected = b.dataset.node || null; this.render(); });
     q<HTMLButtonElement>('[data-goto]').forEach(b => b.onclick = () => { this.tab = 'upgrades'; this.selected = b.dataset.goto!; this.render(); });
     q<HTMLButtonElement>('[data-buy-node]').forEach(b => b.onclick = () => this.buyNode(b.dataset.buyNode!));
+    q<HTMLButtonElement>('[data-next-act]').forEach(b => b.onclick = () => this.startNextAct());
     q<HTMLButtonElement>('[data-start]').forEach(b => b.onclick = () => { this.close(); this.onStart(this.loadout); });
     q<HTMLButtonElement>('[data-refund]').forEach(b => b.onclick = () => {
       const before = this.m;
