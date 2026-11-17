@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { HeroDef, TAG_COLOR, TUNING } from './data';
 import type { Variant } from '../meta/save';
+import { addArt, hasArt } from '../art';
 
 export class Hero {
   cooldown = 0;
@@ -11,17 +12,24 @@ export class Hero {
   trapTimer = 0;
   stars = 1;
   variant: Variant = 'standard';
-  body: Phaser.GameObjects.Rectangle;
-  label: Phaser.GameObjects.Text;
+  body: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle;
+  /** Ground shadow, rimmed in the rarity colour. */
+  ring: Phaser.GameObjects.Ellipse;
+  label?: Phaser.GameObjects.Text;
   starText: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, public id: string, public def: HeroDef, public x: number, public y: number) {
     this.homeX = x; this.homeY = y;
-    const size = 30;
-    this.body = scene.add.rectangle(x, y, size, size, TAG_COLOR[def.tag]).setStrokeStyle(3, rarityColor(def.rarity)).setDepth(2);
-    this.label = scene.add
-      .text(x, y, def.name.split(/[ -]/)[0].slice(0, 4), { fontFamily: 'monospace', fontSize: '11px', color: '#111' })
-      .setOrigin(0.5).setDepth(2);
+    this.ring = scene.add.ellipse(x, y + 16, 30, 10, 0x000000, 0.35).setStrokeStyle(2, rarityColor(def.rarity), 0.9).setDepth(1.5);
+    if (hasArt(id)) {
+      this.body = addArt(scene, id, x, y).setDepth(2);
+    } else {
+      // Greybox fallback for helpers that have no sprite yet.
+      this.body = scene.add.rectangle(x, y, 30, 30, TAG_COLOR[def.tag]).setStrokeStyle(3, rarityColor(def.rarity)).setDepth(2);
+      this.label = scene.add
+        .text(x, y, def.name.split(/[ -]/)[0].slice(0, 4), { fontFamily: 'monospace', fontSize: '11px', color: '#111' })
+        .setOrigin(0.5).setDepth(2);
+    }
     this.starText = scene.add
       .text(x, y + 26, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f5d76e', stroke: '#000', strokeThickness: 3 })
       .setOrigin(0.5).setDepth(2);
@@ -40,7 +48,9 @@ export class Hero {
     this.x += (dx / d) * step;
     this.y += (dy / d) * step;
     this.body.setPosition(this.x, this.y);
-    this.label.setPosition(this.x, this.y);
+    if (this.body instanceof Phaser.GameObjects.Sprite && Math.abs(dx) > 2) this.body.setFlipX(dx < 0);
+    this.ring.setPosition(this.x, this.y + 16);
+    this.label?.setPosition(this.x, this.y);
     this.starText.setPosition(this.x, this.y + 26);
     return false;
   }
@@ -54,7 +64,8 @@ export class Hero {
 
   destroy() {
     this.body.destroy();
-    this.label.destroy();
+    this.ring.destroy();
+    this.label?.destroy();
     this.starText.destroy();
   }
 }

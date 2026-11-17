@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { EnemyDef, TUNING } from './data';
+import { addArt, hasArt } from '../art';
 
 /** An enemy that wanders toward the seed, pushing apart from its neighbours. */
 export class Enemy {
@@ -19,7 +20,7 @@ export class Enemy {
   speedMult = 1;
   timer = 0; // ability timer (Toad Brute's next snack)
   now = 0;
-  body: Phaser.GameObjects.Shape;
+  body: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite;
   shadow?: Phaser.GameObjects.Ellipse;
   ring: Phaser.GameObjects.Arc;
   bar: Phaser.GameObjects.Graphics;
@@ -41,7 +42,11 @@ export class Enemy {
     this.maxHp = def.hp * hpScale;
     this.hp = this.maxHp;
     const s = def.size;
-    if (def.boss) {
+    if (hasArt(id)) {
+      // Pixel sprite, plus a soft ground shadow (further below flyers).
+      this.shadow = scene.add.ellipse(x, y + s, s * 1.8, s * 0.6, 0x000000, def.flying ? 0.3 : 0.25).setDepth(2.5);
+      this.body = addArt(scene, id, x, y).setDepth(3);
+    } else if (def.boss) {
       this.body = scene.add.circle(x, y, s, 0x3f7a3a).setStrokeStyle(6, 0xd4af37).setDepth(3);
     } else if (def.miniBoss) {
       this.body = scene.add.circle(x, y, s, 0x5f8a3a).setStrokeStyle(5, 0xff9f43).setDepth(3);
@@ -86,6 +91,7 @@ export class Enemy {
       }
       this.x += vx * dt;
       this.y += vy * dt;
+      if (this.body instanceof Phaser.GameObjects.Sprite && Math.abs(vx) > 3) this.body.setFlipX(vx < 0);
     }
     // Never overlap the seed.
     const nd = Math.hypot(this.x - this.seedX, this.y - this.seedY);
@@ -99,10 +105,10 @@ export class Enemy {
 
   draw() {
     this.body.setPosition(this.x, this.y);
-    this.shadow?.setPosition(this.x, this.y + 16);
+    this.shadow?.setPosition(this.x, this.y + (this.def.flying ? 16 : this.def.size));
     this.ring.setPosition(this.x, this.y).setVisible(this.webbed);
     if (this.burning) this.body.setAlpha(0.6 + 0.4 * Math.abs(Math.sin(this.now * 12)));
-    else this.body.setAlpha(this.def.physicalImmune ? 0.55 : 1);
+    else this.body.setAlpha(this.def.physicalImmune ? (this.body instanceof Phaser.GameObjects.Sprite ? 0.85 : 0.55) : 1);
     const w = this.def.size * 2.4;
     this.bar.clear();
     if (this.hp < this.maxHp && !this.def.boss) {

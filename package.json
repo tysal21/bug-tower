@@ -5,7 +5,8 @@
     "build": "tsc --noEmit && vite build",
     "build:single": "vite build --mode single",
     "check": "tsc --noEmit",
-    "bot": "node tools/bot.mjs"
+    "bot": "node tools/bot.mjs",
+    "art": "node scripts/art/build.mjs"
   },
   "repository": {
     "type": "git",
