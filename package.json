@@ -4,7 +4,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:single": "vite build --mode single",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "art": "node scripts/art/build.mjs"
   },
   "repository": {
     "type": "git",
