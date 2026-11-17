@@ -86,7 +86,7 @@ export class Menu {
   /** Opens packs one card at a time, then comes back to the Market. */
   openPacks(types: string[]) {
     const cards: Pull[] = [];
-    for (const t of types) cards.push(...openPack(t, this.m, this.save));
+    for (const t of types) cards.push(...openPack(t, this.m, this.save, !this.loadout.team.length && !cards.some(c => c.kind === 'hero')));
     const before = this.m;
     this.questNews.push(...bump(this.save, 'packs', types.length));
     this.applyIncome(before);

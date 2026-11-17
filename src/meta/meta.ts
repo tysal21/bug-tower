@@ -145,8 +145,8 @@ export function packOdds(packType: string, m: MetaStats): Record<Rarity, number>
 const RARITY_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 
 /** One card from a pack of the given type, with its variant. minRarity is used by the pity rule. */
-export function rollCard(packType: string, m: MetaStats, minRarity?: Rarity): Pull {
-  if (!minRarity && Math.random() < TUNING.spells.chancePerCard) {
+export function rollCard(packType: string, m: MetaStats, minRarity?: Rarity, heroOnly = false): Pull {
+  if (!minRarity && !heroOnly && Math.random() < TUNING.spells.chancePerCard) {
     return { id: SPELL_IDS[Math.floor(Math.random() * SPELL_IDS.length)], variant: 'standard', kind: 'spell' };
   }
   const odds = packOdds(packType, m);
@@ -167,9 +167,10 @@ const isBig = (p: Pull) => p.kind === 'hero' && RARITY_ORDER.indexOf(HEROES[p.id
  * All the cards in one pack (Lucky Rip can add a bonus card).
  * Pity: after a dry streak with nothing Epic or better, the pack's card is guaranteed Epic+.
  */
-export function openPack(packType: string, m: MetaStats, save: SaveData): Pull[] {
+export function openPack(packType: string, m: MetaStats, save: SaveData, heroOnly = false): Pull[] {
   const pity = save.pity >= TUNING.pity.packsWithoutEpic;
-  const cards = [rollCard(packType, m, pity ? 'epic' : undefined)];
+  // heroOnly: with no helpers yet, the pack's main card is always a helper, never a spell.
+  const cards = [rollCard(packType, m, pity ? 'epic' : undefined, heroOnly)];
   if (Math.random() < m.bonusCardChance) cards.push(rollCard(packType, m));
   save.pity = cards.some(isBig) ? 0 : save.pity + 1;
   return cards;

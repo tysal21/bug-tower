@@ -245,7 +245,7 @@ export class BattleScene extends Phaser.Scene {
     else return;
     this.stats.packs++;
     this.uiPress = true; // don't sting with the press that bought the pack
-    const cards = openPack(TUNING.nectar.packType, this.meta, this.save);
+    const cards = openPack(TUNING.nectar.packType, this.meta, this.save, !this.loadout.team.length);
     this.quests(bump(this.save, 'packs'));
     this.reveal.show(cards, this.loadout, () => this.meta, () => {
       this.quests(this.reveal.questNews.splice(0));

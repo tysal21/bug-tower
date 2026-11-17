@@ -6,7 +6,9 @@
   - [x] Step 1: top-down battle, roaming helpers, combos, AoE Stinger, spawn ramp, Frog King
   - [x] Step 2: between-runs screen: Market with rerolls, boxes, Grove packs, brood combs, honeycomb skill tree, collection, local save
   - [x] Step 3: spells, quest cells, Nectar packs opened mid-run, Toad Brute mini-boss, pity
-  - [ ] Tyler playtests and we tune (run length, pack prices, quest goals)
+  - [x] Step 4: tuned to Tyler's progression curve (coins economy, First Rips quest, Meadow Box at 5 coins, Hatchery, slow-motion pack opening, quick first loss)
+  - [ ] Tyler playtests and we tune further
+  - [ ] Act soft resets: planned for when chapter 2 exists
 - [ ] Phase 3: Pack-ripping feel (tear-to-open, face-down cards, rarity glow, foil/holo effects)
 - [ ] Phase 4: Content and balance (cards in JSON, balance spreadsheet)
 - [ ] Phase 5: Art and audio (PixelLab art, style guide, sound, music)
@@ -15,5 +17,4 @@
 
 
 ## Waiting on Tyler
-- Merge the Phase 2 pull request so the game publishes to GitHub Pages (Settings > Pages > Source: GitHub Actions must be on).
 - Play a few runs and say what feels good or bad.
