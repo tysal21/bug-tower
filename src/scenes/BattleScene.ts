@@ -51,6 +51,8 @@ export class BattleScene extends Phaser.Scene {
   nectar = 0;
   packsBought = 0;
   packLock = 0;
+  sealed = 0; // free packs waiting to be opened (Hatchery, Big Clutch)
+  hatchTimer = 0;
   miniIdx = 0; // next mini-boss in tuning.run.miniBossAtSec
   questsDone: string[] = [];
   rallyUntil = 0;
@@ -91,7 +93,7 @@ export class BattleScene extends Phaser.Scene {
     const q = new URLSearchParams(location.search);
     this.maxHelpers = this.meta.maxHelpers;
     this.enemies = []; this.heroes = Array.from({ length: this.maxHelpers }, () => null);
-    this.maxSeedHp = TUNING.seedHp * this.meta.seedHpMult;
+    this.maxSeedHp = (this.save.runs === 0 ? TUNING.firstRun.seedHp : TUNING.seedHp) * this.meta.seedHpMult;
     Enemy.webSlowBonus = this.meta.webSlow;
     this.seedHp = this.maxSeedHp;
     this.spawnDebt = 0; this.nextSurge = TUNING.run.surgeEverySec; this.boss = null; this.bossSpawned = false;
@@ -107,7 +109,10 @@ export class BattleScene extends Phaser.Scene {
     // ?at=95 starts the run 95 seconds in (handy for testing mini-bosses).
     if (q.has('at')) this.time_ = Number(q.get('at')) || 0;
     this.miniIdx = TUNING.run.miniBossAtSec.filter(t => t < this.time_).length;
+    this.nectar = this.loadout.nectar ?? 0;
     if (q.has('nectar')) this.nectar = Number(q.get('nectar')) || 0;
+    this.sealed = this.meta.startPacks;
+    this.hatchTimer = this.hatcherySec;
 
     // Ground: a top-down meadow with a worn circle around the seed.
     this.add.rectangle(W / 2, H / 2, W, H, 0x23301c);
@@ -170,7 +175,7 @@ export class BattleScene extends Phaser.Scene {
   // ---------- spells ----------
   castSpell(i: number) {
     const sp = this.loadout.spells[i];
-    if (!sp || this.paused || this.state !== 'playing' || (this.spellCd[sp.id]?.left ?? 0) > 0) return;
+    if (!sp || this.paused || this.reveal.active || this.state !== 'playing' || (this.spellCd[sp.id]?.left ?? 0) > 0) return;
     const d = SPELLS[sp.id];
     const power = Math.pow(TUNING.spells.starPower, sp.stars - 1);
     const max = (d.cooldown * Math.pow(TUNING.spells.starHaste, sp.stars - 1)) / (1 + this.meta.spellHaste);
@@ -223,12 +228,22 @@ export class BattleScene extends Phaser.Scene {
     this.add.sprite(x - 8, y + BTN.h / 2 - 4, 'pack_meadow', 0).setScale(1.5).setAngle(-12).setDepth(12).setVisible(TUNING.nectar.enabled).play('pack_meadow-idle');
   }
 
-  /** Spend Nectar on a pack. The fight pauses while you flip the cards. */
+  /** Seconds between free Hatchery packs (Infinity without the node). */
+  get hatcherySec() {
+    const lv = this.meta.hatchery;
+    return lv ? TUNING.nectar.hatcherySec[Math.min(lv, TUNING.nectar.hatcherySec.length) - 1] : Infinity;
+  }
+
+  /**
+   * Opens a sealed pack if you have one, otherwise spends Nectar on a new one.
+   * The fight keeps going in slow motion while you flip, so ripping fast matters.
+   */
   buyPack() {
-    if (!TUNING.nectar.enabled || this.paused || performance.now() < this.packLock || this.state !== 'playing' || this.nectar < this.packPrice) return;
-    this.nectar -= this.packPrice;
-    this.packsBought++; this.stats.packs++;
-    this.paused = true;
+    if (!TUNING.nectar.enabled || this.paused || this.reveal.active || performance.now() < this.packLock || this.state !== 'playing') return;
+    if (this.sealed > 0) this.sealed--;
+    else if (this.nectar >= this.packPrice) { this.nectar -= this.packPrice; this.packsBought++; }
+    else return;
+    this.stats.packs++;
     this.uiPress = true; // don't sting with the press that bought the pack
     const cards = openPack(TUNING.nectar.packType, this.meta, this.save);
     this.quests(bump(this.save, 'packs'));
@@ -236,8 +251,7 @@ export class BattleScene extends Phaser.Scene {
       this.quests(this.reveal.questNews.splice(0));
       this.syncTeam();
       this.packLock = performance.now() + 250; // the Space press that kept the card shouldn't buy another pack
-      this.paused = false;
-    });
+    }, true);
   }
 
   quests(names: string[]) {
@@ -488,6 +502,15 @@ export class BattleScene extends Phaser.Scene {
       this.showBanner('Swarm incoming!');
       for (let i = 0; i < run.surgeSize; i++) this.spawn(this.pickEnemy());
     }
+    const rush = run.openingRush;
+    if (this.time_ >= rush.atSec && this.time_ - dt < rush.atSec) {
+      for (let i = 0; i < rush.count; i++) {
+        const g = this.spawn('grub');
+        const ang = (i / rush.count) * Math.PI * 2 + Math.random() * 0.5;
+        g.x = SEED.x + Math.cos(ang) * rush.distance; g.y = SEED.y + Math.sin(ang) * rush.distance * 0.8;
+        this.ring(g.x, g.y, 22, 0x6fae4a);
+      }
+    }
     if (!this.bossSpawned && this.time_ >= (run.miniBossAtSec[this.miniIdx] ?? Infinity)) {
       this.miniIdx++;
       this.spawn(TUNING.miniBoss.enemy).timer = TUNING.miniBoss.eatEverySec;
@@ -578,8 +601,15 @@ export class BattleScene extends Phaser.Scene {
   update(_t: number, deltaMs: number) {
     this.drawHud();
     if (this.state !== 'playing' || this.paused) return;
-    const dt = Math.min(deltaMs / 1000, 0.05) * this.speed;
+    const slow = this.reveal.active ? TUNING.nectar.revealTimeScale : 1;
+    const dt = Math.min(deltaMs / 1000, 0.05) * this.speed * slow;
     this.time_ += dt;
+    this.hatchTimer -= dt;
+    if (this.hatchTimer <= 0) {
+      this.hatchTimer = this.hatcherySec;
+      this.sealed++;
+      this.floatText(W - BTN.w / 2 - 16, H - BTN.h - 30, '🪺 A pack hatched!', '#ffd76e');
+    }
 
     this.updateSpawns(dt);
     this.updateMiniBosses(dt);
@@ -610,8 +640,9 @@ export class BattleScene extends Phaser.Scene {
     const nectarOn = TUNING.nectar.enabled;
     this.hud.setText(`${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}${nectarOn ? `   Nectar ${Math.floor(this.nectar)}` : ''}${this.rallying ? '   RALLY!' : ''}`);
     if (nectarOn) {
-      const can = this.nectar >= this.packPrice;
-      this.packLabel.setText(`Open a pack [Space]\n${Math.floor(this.nectar)} / ${this.packPrice} Nectar`).setColor(can ? '#1b1405' : '#a59a84');
+      const can = this.sealed > 0 || this.nectar >= this.packPrice;
+      const line2 = this.sealed > 0 ? `${this.sealed} sealed, free` : `${Math.floor(this.nectar)} / ${this.packPrice} Nectar`;
+      this.packLabel.setText(`Open a pack [Space]\n${line2}`).setColor(can ? '#1b1405' : '#a59a84');
       this.packBox.setFillStyle(can ? 0xf2c94c : 0x241f14, 0.92);
     }
     this.bossBar.clear();

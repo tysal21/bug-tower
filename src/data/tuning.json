@@ -1,5 +1,5 @@
 {
-  "seedHp": 180,
+  "seedHp": 140,
   "stinger": {
     "damage": 5,
     "attacksPerSec": 4,
@@ -27,9 +27,9 @@
   "heroLeash": 330,
   "run": {
     "note": "Enemies spawn non-stop and ramp up until bossAtSec, then the Frog King arrives. Surges are short bursts that feel like waves.",
-    "bossAtSec": 300,
-    "spawnPerSecStart": 1.2,
-    "spawnPerSecEnd": 2.5,
+    "bossAtSec": 240,
+    "spawnPerSecStart": 0.8,
+    "spawnPerSecEnd": 2.8,
     "hpGrowthPerMin": 0.1,
     "surgeEverySec": 60,
     "surgeSize": 8,
@@ -57,9 +57,15 @@
       }
     ],
     "miniBossAtSec": [
-      100,
-      200
-    ]
+      80,
+      160
+    ],
+    "openingRush": {
+      "note": "A ring of grubs burrows out of the ground near the seed right at the start, so a Stinger-only run is lost in seconds.",
+      "atSec": 1.5,
+      "count": 6,
+      "distance": 330
+    }
   },
   "boss": {
     "tongueEverySec": 7,
@@ -81,13 +87,19 @@
     "starHaste": 0.85
   },
   "nectar": {
-    "note": "Nectar drops from kills and buys Meadow Packs in the middle of a run. The price grows with every pack bought that run. Set enabled to false to turn mid-run packs off.",
+    "note": "Nectar drops from kills and buys Meadow Packs in the middle of a run. The price grows with every pack bought that run. Sealed packs (from the Hatchery and Big Clutch) open for free. While you flip a card the fight keeps going at revealTimeScale speed. hatcherySec[i] = seconds between free packs at Hatchery level i+1.",
     "enabled": true,
     "perKill": 1,
     "packPrice": 5,
     "priceGrowth": 1.5,
     "packType": "meadow",
-    "miniBossBounty": 15
+    "miniBossBounty": 15,
+    "revealTimeScale": 0.3,
+    "hatcherySec": [
+      45,
+      35,
+      25
+    ]
   },
   "pity": {
     "note": "After this many packs in a row with nothing Epic or better, the next card is Epic or better.",
@@ -98,6 +110,17 @@
     "eatEverySec": 5,
     "eatRange": 150,
     "healFrac": 0.15,
-    "mastery": 5
+    "mastery": 12
+  },
+  "startCoins": 3,
+  "mastery": {
+    "note": "Mastery earned per run = perKill x kills + perSec x seconds survived + miniBoss each + boss for the Frog King, times Harvest.",
+    "perKill": 1.25,
+    "perSec": 0.3,
+    "boss": 250
+  },
+  "firstRun": {
+    "note": "Your very first run is a forced, quick loss that opens the Market and skill tree. The seed starts this weak only on run 1.",
+    "seedHp": 55
   }
 }
