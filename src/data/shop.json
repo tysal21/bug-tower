@@ -1,6 +1,7 @@
 {
-  "note": "Shop between runs. income = coins you get every shop visit before upgrades. packType picks the odds below. weight = how often it shows up in a random slot. guaranteed = always takes the first slot once unlocked. Unlocks: requiresIncome (your coins per visit), requiresChapter (beat the boss of the chapter before). bonusMastery = Mastery that comes with the item. variants: base chance a card is Foil/Holo and the damage bonus each gives. brood: minutes for a comb to hatch a free pack between runs.",
+  "note": "Shop between runs. income = coins you get every shop visit before upgrades. packType picks the odds below. minCheap = a fresh shop always holds at least this many Meadow Packs, so pricier packs never crowd out cheap bodies. weight = how often it shows up in a random slot. guaranteed = always takes the first slot once unlocked. Unlocks: requiresIncome (your coins per visit), requiresChapter (beat the boss of the chapter before). bonusMastery = Mastery that comes with the item. variants: base chance a card is Foil/Holo and the damage bonus each gives. brood: minutes for a comb to hatch a free pack between runs.",
   "income": 3,
+  "minCheap": 2,
   "offerSlots": 3,
   "rerollCost": 1,
   "items": {

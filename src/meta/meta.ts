@@ -18,7 +18,7 @@ export interface Branch { color: string; angle: number; blurb: string }
 export interface Pull { id: string; variant: Variant; kind: 'hero' | 'spell' }
 
 export const SHOP = shopJson as {
-  income: number; offerSlots: number; rerollCost: number; items: Record<string, ShopItem>;
+  income: number; minCheap: number; offerSlots: number; rerollCost: number; items: Record<string, ShopItem>;
   packTypes: Record<string, { odds: Record<Rarity, number> }>;
   variants: Record<'foil' | 'holo', { chance: number; damage: number }>;
   brood: { hatchMinutes: number };
@@ -127,7 +127,12 @@ export function rollOffers(save: SaveData, slots = metaStats(save).offerSlots): 
     for (const id of pool) { if (r < SHOP.items[id].weight) return id; r -= SHOP.items[id].weight; }
     return pool[0];
   };
-  return Array.from({ length: slots }, (_, i) => fixed[i] ?? random());
+  const offers = Array.from({ length: slots }, (_, i) => fixed[i] ?? random());
+  // Always leave room for cheap packs: at least minCheap Meadow Packs in a full shop roll.
+  for (let i = offers.length - 1; i >= 0 && slots > 1 && offers.filter(id => id === 'meadow').length < Math.min(SHOP.minCheap, slots - fixed.length); i--) {
+    if (offers[i] !== 'meadow' && !SHOP.items[offers[i]].guaranteed) offers[i] = 'meadow';
+  }
+  return offers;
 }
 
 /** Rarity odds (in %) for a pack type after Fortune upgrades. */

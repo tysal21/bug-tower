@@ -114,7 +114,7 @@
   },
   "mastery": {
     "note": "Mastery earned per run (before Harvest and Heartwood bonuses).",
-    "perKill": 1,
+    "perKill": 0.6,
     "perSec": 0.2,
     "miniBoss": 5,
     "boss": 60
@@ -124,8 +124,8 @@
     "perAct": 3,
     "hpPerChapter": 0.3,
     "spawnPerChapter": 0.12,
-    "heartwoodPer": 100,
-    "heartwoodMastery": 0.05,
+    "heartwoodPer": 200,
+    "heartwoodMastery": 0.02,
     "acts": [
       {
         "name": "Act I",
