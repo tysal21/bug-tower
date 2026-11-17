@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ENEMIES, HEROES, HERO_IDS, SPELLS, TUNING, DamageType, TAG_COLOR } from '../game/data';
 import { Enemy } from '../game/Enemy';
 import { Hero } from '../game/Hero';
-import { MetaStats, bump, openPack, variantDamage } from '../meta/meta';
+import { MetaStats, actDef, bump, chapterInAct, openPack, variantDamage } from '../meta/meta';
 import type { Loadout } from '../meta/run';
 import type { SaveData } from '../meta/save';
 import type { Reveal } from '../ui/reveal';
@@ -19,7 +19,7 @@ function homeFor(i: number, slots: number) {
   return { x: SEED.x + Math.cos(a) * r, y: SEED.y + Math.sin(a) * r };
 }
 
-export interface RunResult { won: boolean; seconds: number; kills: number; miniBosses: number; quests: string[] }
+export interface RunResult { won: boolean; seconds: number; kills: number; miniBosses: number; quests: string[]; wave: number }
 export interface RunSetup { loadout: Loadout; meta: MetaStats; save: SaveData; reveal: Reveal; onEnd?: (r: RunResult) => void }
 
 interface SpellButton { id: string; box: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; frame: Phaser.GameObjects.NineSlice; ic: Phaser.GameObjects.Image }
@@ -82,6 +82,10 @@ export class BattleScene extends Phaser.Scene {
 
   constructor() { super('battle'); }
 
+  hpMult = 1; // chapter + act enemy health
+  spawnMult = 1; // chapter spawn rate
+  armorBonus = 0; // act: extra armor on every enemy
+
   init(data: RunSetup) {
     this.loadout = data.loadout ?? { team: [], spells: [] };
     this.meta = data.meta;
@@ -99,6 +103,12 @@ export class BattleScene extends Phaser.Scene {
     this.enemies = []; this.heroes = Array.from({ length: this.maxHelpers }, () => null);
     this.maxSeedHp = (this.save.runs === 0 ? TUNING.firstRun.seedHp : TUNING.seedHp) * this.meta.seedHpMult;
     Enemy.webSlowBonus = this.meta.webSlow;
+    // Chapter and act difficulty.
+    const ch = TUNING.chapters, act = actDef(this.save.act), inAct = chapterInAct(this.save) - 1;
+    this.hpMult = (1 + ch.hpPerChapter * inAct) * act.hpMult;
+    this.spawnMult = 1 + ch.spawnPerChapter * inAct;
+    this.armorBonus = act.armor;
+    Enemy.actSpeed = act.speedMult;
     this.seedHp = this.maxSeedHp;
     this.spawnDebt = 0; this.nextSurge = TUNING.run.surgeEverySec; this.boss = null; this.bossSpawned = false;
     this.bossTongue = 0; this.bossFlop = 0; this.traps = [];
@@ -154,7 +164,8 @@ export class BattleScene extends Phaser.Scene {
     // Bring in the team bought in the shop.
     this.syncTeam();
     this.drawHud();
-    this.showBanner(this.loadout.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!');
+    this.showBanner(`${act.name} · Chapter ${this.save.chapter}\n${this.loadout.team.length ? 'Defend the Heartseed!' : 'Hold on enemies to Sting them!'}`);
+    if (act.mechanic) this.time.delayedCall(1800, () => this.state === 'playing' && this.showBanner(act.mechanic));
   }
 
   /** Makes the helpers and spell buttons on the field match the loadout (after the shop, and after each mid-run pack). */
@@ -430,7 +441,8 @@ export class BattleScene extends Phaser.Scene {
     if (!e.alive) return;
     if (type === 'physical') {
       if (e.def.physicalImmune) { if (showNumber) this.floatText(e.x, e.y - 20, 'IMMUNE', '#b07cff'); return; }
-      const armor = e.sundered ? e.def.armor * (1 - TUNING.sunderArmorCut) : e.def.armor;
+      const base = Math.min(0.9, e.def.armor + this.armorBonus);
+      const armor = e.sundered ? base * (1 - TUNING.sunderArmorCut) : base;
       amount *= 1 - armor;
     }
     if (e.def.boss) amount *= 1 + this.meta.bossVuln;
@@ -492,7 +504,7 @@ export class BattleScene extends Phaser.Scene {
     else if ((t -= W) < H) { x = W + m; y = t; }
     else if ((t -= H) < W) { x = W - t; y = H + m; }
     else { t -= W; x = -m; y = H - t; }
-    const hpScale = def.boss ? 1 : 1 + TUNING.run.hpGrowthPerMin * (this.time_ / 60);
+    const hpScale = this.hpMult * (def.boss ? 1 : 1 + TUNING.run.hpGrowthPerMin * (this.time_ / 60));
     const e = new Enemy(this, enemy, def, x, y, SEED.x, SEED.y, SEED.r, hpScale);
     this.enemies.push(e);
     return e;
@@ -501,13 +513,13 @@ export class BattleScene extends Phaser.Scene {
   updateSpawns(dt: number) {
     const run = TUNING.run;
     const progress = Math.min(1, this.time_ / run.bossAtSec);
-    let rate = run.spawnPerSecStart + (run.spawnPerSecEnd - run.spawnPerSecStart) * progress;
+    let rate = (run.spawnPerSecStart + (run.spawnPerSecEnd - run.spawnPerSecStart) * progress) * this.spawnMult;
     if (this.bossSpawned) rate *= run.spawnRateDuringBoss;
     this.spawnDebt += rate * dt;
     while (this.spawnDebt >= 1) { this.spawnDebt--; this.spawn(this.pickEnemy()); }
     if (!this.bossSpawned && this.time_ >= this.nextSurge) {
       this.nextSurge += run.surgeEverySec;
-      this.showBanner('Swarm incoming!');
+      this.showBanner(`Wave ${this.wave}: swarm incoming!`);
       for (let i = 0; i < run.surgeSize; i++) this.spawn(this.pickEnemy());
     }
     const rush = run.openingRush;
@@ -601,7 +613,7 @@ export class BattleScene extends Phaser.Scene {
     this.banner.setText(result === 'won' ? 'The Heartseed survives!' : 'The Heartseed has fallen').setFontSize(36).setAlpha(1);
     // Short pause so you see what happened, then the menu takes over.
     this.time.delayedCall(1400, () => this.onEnd({
-      won: result === 'won', seconds: Math.round(this.time_), kills: this.stats.kills, miniBosses: this.stats.miniBosses, quests: this.questsDone,
+      won: result === 'won', seconds: Math.round(this.time_), kills: this.stats.kills, miniBosses: this.stats.miniBosses, quests: this.questsDone, wave: this.wave,
     }));
   }
 
@@ -642,11 +654,14 @@ export class BattleScene extends Phaser.Scene {
     else this.seedSprite.clearTint();
   }
 
+  /** Waves are the surges: wave 1 until the first surge, then +1 each surge. */
+  get wave() { return 1 + Math.floor(Math.min(this.time_, TUNING.run.bossAtSec) / TUNING.run.surgeEverySec); }
+
   drawHud() {
     const left = TUNING.run.bossAtSec - this.time_;
     const timer = this.bossSpawned ? 'BOSS FIGHT' : `Boss in ${this.clock(left)}`;
     const nectarOn = TUNING.nectar.enabled;
-    this.hud.setText(`${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}${nectarOn ? `   Nectar ${Math.floor(this.nectar)}` : ''}${this.rallying ? '   RALLY!' : ''}`);
+    this.hud.setText(`Ch ${this.save?.chapter ?? 1}   Wave ${this.wave}   ${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}${nectarOn ? `   Nectar ${Math.floor(this.nectar)}` : ''}${this.rallying ? '   RALLY!' : ''}`);
     if (nectarOn) {
       const can = this.sealed > 0 || this.nectar >= this.packPrice;
       const line2 = this.sealed > 0 ? `${this.sealed} sealed, free` : `${Math.floor(this.nectar)} / ${this.packPrice} Nectar`;

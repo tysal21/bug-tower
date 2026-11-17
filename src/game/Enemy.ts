@@ -6,6 +6,8 @@ import { addArt, hasArt } from '../art';
 export class Enemy {
   /** Extra web slow from the skill tree (set by the battle scene). */
   static webSlowBonus = 0;
+  /** Act-wide speed multiplier for every enemy (set by the battle scene). */
+  static actSpeed = 1;
   hp: number;
   maxHp: number;
   alive = true;
@@ -77,8 +79,8 @@ export class Enemy {
       // Head for the seed, drifting side to side so they don't march in straight lines.
       const angle = Math.atan2(dy, dx) + Math.sin(now * this.wobbleSpeed + this.wobblePhase) * this.wobbleAmount * Math.min(1, dist / 250);
       const slow = this.webbed ? 1 - Math.min(0.8, TUNING.webSlow + Enemy.webSlowBonus) : 1;
-      let vx = Math.cos(angle) * this.def.speed * slow * this.speedMult;
-      let vy = Math.sin(angle) * this.def.speed * slow * this.speedMult;
+      let vx = Math.cos(angle) * this.def.speed * slow * this.speedMult * Enemy.actSpeed;
+      let vy = Math.sin(angle) * this.def.speed * slow * this.speedMult * Enemy.actSpeed;
       // Separation: push away from neighbours of the same layer (ground or air).
       for (const o of others) {
         if (o === this || !o.alive || o.def.flying !== this.def.flying) continue;

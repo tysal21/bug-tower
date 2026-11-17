@@ -18,7 +18,7 @@ export interface Branch { color: string; angle: number; blurb: string }
 export interface Pull { id: string; variant: Variant; kind: 'hero' | 'spell' }
 
 export const SHOP = shopJson as {
-  offerSlots: number; rerollCost: number; items: Record<string, ShopItem>;
+  minCheap: number; offerSlots: number; rerollCost: number; items: Record<string, ShopItem>;
   packTypes: Record<string, { odds: Record<Rarity, number> }>;
   variants: Record<'foil' | 'holo', { chance: number; damage: number }>;
   brood: { hatchMinutes: number };
@@ -50,7 +50,7 @@ export interface MetaStats {
   combs: number; hatchSpeed: number; twinChance: number; jellyChance: number;
   rarityBoost: number; legendaryBoost: number; foilChance: number; holoChance: number;
   maxHelpers: number; nectarMult: number; spellHaste: number; wildfireRadius: number; stingerWebBonus: number; antStart: number;
-  hatchery: number; startPacks: number;
+  hatchery: number; startPacks: number; heartwoodMult: number;
   heroDmg: Record<string, number>; // extra damage per hero from Legends nodes
 }
 
@@ -63,6 +63,7 @@ export function metaStats(save: SaveData): MetaStats {
     combs: 0, hatchSpeed: 0, twinChance: 0, jellyChance: 0,
     rarityBoost: 0, legendaryBoost: 0, foilChance: SHOP.variants.foil.chance, holoChance: SHOP.variants.holo.chance,
     maxHelpers: TUNING.maxHelpers, nectarMult: 1, spellHaste: 0, wildfireRadius: 0, stingerWebBonus: 0, antStart: 0, hatchery: 0, startPacks: 0,
+    heartwoodMult: 1 + save.heartwood * TUNING.chapters.heartwoodMastery,
   };
   const add = (effect: Record<string, number>, times: number) => {
     for (const [k, v] of Object.entries(effect)) (s as unknown as Record<string, number>)[k] += v * times;
@@ -121,11 +122,16 @@ export function itemUnlocked(save: SaveData, id: string) {
 export function rollOffers(save: SaveData): string[] {
   const pool = Object.keys(SHOP.items).filter(id => itemUnlocked(save, id));
   const total = pool.reduce((a, id) => a + SHOP.items[id].weight, 0);
-  return Array.from({ length: metaStats(save).offerSlots }, () => {
+  const offers = Array.from({ length: metaStats(save).offerSlots }, () => {
     let r = Math.random() * total;
     for (const id of pool) { if (r < SHOP.items[id].weight) return id; r -= SHOP.items[id].weight; }
     return pool[0];
   });
+  // Always leave room for cheap bodies: at least minCheap Meadow Packs (pricier packs fill the rest).
+  for (let i = offers.length - 1; i >= 0 && offers.filter(id => id === 'meadow').length < Math.min(SHOP.minCheap, offers.length); i--) {
+    if (offers[i] !== 'meadow') offers[i] = 'meadow';
+  }
+  return offers;
 }
 
 /** Rarity odds (in %) for a pack type after Fortune upgrades. */
@@ -152,7 +158,7 @@ export function rollCard(packType: string, m: MetaStats, minRarity?: Rarity, her
   const odds = packOdds(packType, m);
   const allowed = RARITY_ORDER.filter(k => !minRarity || RARITY_ORDER.indexOf(k) >= RARITY_ORDER.indexOf(minRarity));
   let r = Math.random() * allowed.reduce((a, k) => a + odds[k], 0);
-  let rarity: Rarity = allowed[0];
+  let rarity: Rarity = allowed.filter(k => odds[k] > 0).pop() ?? allowed[0];
   for (const k of allowed) { if (r < odds[k]) { rarity = k; break; } r -= odds[k]; }
   const pool = HERO_IDS.filter(id => HEROES[id].rarity === rarity);
   const id = pool[Math.floor(Math.random() * pool.length)];
@@ -209,6 +215,40 @@ export function refundAll(save: SaveData) {
   }
   save.nodes = {};
   save.combs = [];
+}
+
+// ---------- chapters and acts ----------
+export const actDef = (act: number) => TUNING.chapters.acts[Math.min(act, TUNING.chapters.acts.length) - 1];
+/** Chapter number inside the current act (1..perAct). */
+export const chapterInAct = (save: SaveData) => save.chapter - (save.act - 1) * TUNING.chapters.perAct;
+export const lastChapter = () => TUNING.chapters.perAct * TUNING.chapters.acts.length;
+
+/** Called when the Frog King falls: next chapter, and an act transition after the act's last chapter. */
+export function bossBeaten(save: SaveData) {
+  if (save.chapter >= lastChapter()) return; // main chapters done: keep replaying the last one
+  save.chapter++;
+  if (chapterInAct(save) > TUNING.chapters.perAct) save.actPending = true;
+}
+
+/** Mastery you hold plus everything spent in the tree: what an act reset turns into Heartwood. */
+export function investedMastery(save: SaveData) {
+  let total = save.mastery;
+  for (const [id, rank] of Object.entries(save.nodes)) {
+    const node = TREE.nodes[id];
+    if (node && !node.quest) for (let i = 0; i < rank; i++) total += node.cost[i];
+  }
+  return total;
+}
+export const heartwoodFor = (save: SaveData) => Math.floor(investedMastery(save) / TUNING.chapters.heartwoodPer);
+
+/** Act transition: the skill tree and Mastery reset, Heartwood is kept forever. Quests, the collection and pack unlocks stay. */
+export function beginNextAct(save: SaveData) {
+  save.heartwood += heartwoodFor(save);
+  save.mastery = 0;
+  save.nodes = {};
+  save.combs = [];
+  save.act++;
+  save.actPending = false;
 }
 
 /** Mastery earned from a run. */

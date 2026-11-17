@@ -4,6 +4,7 @@ import { HEROES, HERO_IDS, SPELLS, SPELL_IDS, TUNING, TAG_COLOR } from '../game/
 import {
   SHOP, TREE, MetaStats, Pull, Rarity, metaStats, nodeUnlocked, refundAll, rollOffers, openPack, packOdds,
   syncCombs, combProgress, hatchComb, hatchMs, VARIANT_RANK, variantDamage, questDone, questProgress, bump,
+  actDef, heartwoodFor, beginNextAct, lastChapter,
 } from '../meta/meta';
 import type { Loadout } from '../meta/run';
 import { Reveal, VARIANT_LABEL } from './reveal';
@@ -13,7 +14,7 @@ import { UI, ICONS, icon, nodeIcon, heroThumb } from '../art/ui';
 const ICONS_URL = (k: string) => ICONS[k] ?? '';
 import { PACK_ART } from '../art';
 
-export interface RunSummary { seconds: number; kills: number; mastery: number; won: boolean; quests: string[] }
+export interface RunSummary { seconds: number; kills: number; mastery: number; won: boolean; quests: string[]; wave: number }
 
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -109,6 +110,14 @@ export class Menu {
     }
   }
 
+  /** Act transition: reset the tree for Heartwood, then back to the Market. */
+  startNextAct() {
+    beginNextAct(this.save);
+    writeSave(this.save);
+    this.selected = null;
+    this.open(this.summary);
+  }
+
   // ---------- tree ----------
   buyNode(id: string) {
     const node = TREE.nodes[id];
@@ -137,18 +146,33 @@ export class Menu {
       <div class="screen">
         <header class="topbar">
           <h1>Heartseed</h1>
-          ${s ? `<p class="summary">${s.won ? 'You beat the Frog King!' : 'The Heartseed fell.'} Lasted <b>${clock(s.seconds)}</b> · ${s.kills} kills · <b class="mastery">+${s.mastery} Mastery</b></p>` : '<p class="summary muted">Spend coins on packs, Mastery on upgrades, then defend the seed.</p>'}
+          <button class="restart" data-reset title="Wipe your save and start over from the very first run">↺ Restart progress</button>
+          <p class="chapter">${actDef(this.save.act).name} · Chapter ${this.save.chapter}${this.save.heartwood ? ` · <span class="heartwood" title="Heartwood: kept through act resets. +${Math.round(TUNING.chapters.heartwoodMastery * 100)}% Mastery each">🪵 ${this.save.heartwood}</span>` : ''}</p>
+          ${s ? `<p class="summary">${s.won ? 'You beat the Frog King!' : 'The Heartseed fell.'} Lasted <b>${clock(s.seconds)}</b> · wave ${s.wave} · ${s.kills} kills · <b class="mastery">+${s.mastery} Mastery</b></p>` : '<p class="summary muted">Spend coins on packs, Mastery on upgrades, then defend the seed.</p>'}
           ${this.questNews.length ? `<p class="quest-news">📜 Quest complete: <b>${[...new Set(this.questNews)].join(', ')}</b></p>` : ''}
         </header>
         ${this.marketHtml()}
         ${this.progressHtml()}
-      </div>`;
+      </div>
+      ${this.save.actPending ? this.actHtml() : ''}`;
     const market = this.root.querySelector('.market');
     if (market) market.scrollTop = scroll;
     // On narrow screens the tree is wider than the panel: start it centred on the seed.
     const wrap = this.root.querySelector<HTMLElement>('.graph-wrap');
     if (wrap && wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = graphScroll ?? (wrap.scrollWidth - wrap.clientWidth) / 2;
     this.bind();
+  }
+
+  actHtml() {
+    const d = actDef(this.save.act + 1);
+    const wood = heartwoodFor(this.save);
+    return `<div class="act-gate"><div class="act-card">
+      <h2>${actDef(this.save.act).name} complete!</h2>
+      <p>${d.name} begins. Your skill tree and Mastery reset, and you rebuild your economy from scratch against tougher enemies.</p>
+      ${d.mechanic ? `<p class="act-mech">⚠ ${d.mechanic}. Enemies also have ${Math.round((d.hpMult - 1) * 100)}% more health.</p>` : ''}
+      <p>You keep: <b>🪵 ${wood} Heartwood</b> (one per ${TUNING.chapters.heartwoodPer} Mastery you invested, +${Math.round(TUNING.chapters.heartwoodMastery * 100)}% Mastery each, forever), your quests, your collection and the packs you've unlocked.</p>
+      <button data-next-act>Begin ${d.name}</button>
+    </div></div>`;
   }
 
   currencyHtml() {
@@ -172,7 +196,7 @@ export class Menu {
           title="Rare+ ${pct(100 - odds.common)} · Legendary ${pct(odds.legendary)}">
         <div class="pack-art" style="--pack:url('${PACK_ART[it.packType as 'meadow' | 'grove']}')">${it.packs > 1 ? '<i></i><i></i><i></i>' : '<i></i>'}</div>
         <div class="offer-name">${it.name}</div>
-        <div class="offer-sub">${it.packs > 1 ? `${it.packs} packs` : '1 pack'}${it.packType === 'grove' ? ' · rare odds' : ''}${it.bonusNectar ? ` · +${it.bonusNectar} Nectar` : ''} ${deal}</div>
+        <div class="offer-sub">${it.packs > 1 ? `${it.packs} packs` : '1 pack'}${it.packType === 'grove' ? ' · rare odds' : it.packType === 'elder' ? ' · epic+ only' : ''}${it.bonusNectar ? ` · +${it.bonusNectar} Nectar` : ''} ${deal}</div>
         <div class="offer-odds">Rare+ ${pct(100 - odds.common)}</div>
         <span class="price">${it.cost} ${icon('gold')}</span>
       </button>`;
@@ -248,7 +272,7 @@ export class Menu {
         ${this.tab === 'upgrades' ? this.treeHtml() : this.collectionHtml()}
         <footer class="progress-foot">
           ${this.tab === 'upgrades' ? this.detailHtml() : '<div></div>'}
-          <button class="battle" data-start>Battle<small>${this.loadoutLabel()}</small></button>
+          <button class="battle" data-start>Battle<small>Chapter ${this.save.chapter}${this.save.chapter >= lastChapter() ? ' (final)' : ''} · ${this.loadoutLabel()}</small></button>
         </footer>
       </section>`;
   }
@@ -390,7 +414,7 @@ export class Menu {
         }).join('')}</div>
         <h3>Your pull odds</h3>
         <table class="odds"><tr><th></th>${order.map(r => `<th class="r-${r}">${r}</th>`).join('')}</tr>
-          ${row('Meadow', 'meadow')}${row('Grove', 'grove')}</table>
+          ${row('Meadow', 'meadow')}${row('Grove', 'grove')}${row('Elder', 'elder')}</table>
         <p class="muted small">Any card: Foil ${pct(m.foilChance * 100)} · Holo ${pct(m.holoChance * 100)} · bonus card ${pct(m.bonusCardChance * 100)}. Raise these in the Fortune branch. About 1 card in ${Math.round(1 / TUNING.spells.chancePerCard)} is a spell. After ${TUNING.pity.packsWithoutEpic} packs with nothing Epic or better, the next one is guaranteed (you're at ${Math.min(this.save.pity, TUNING.pity.packsWithoutEpic)}).</p>
         <button class="link" data-reset>Reset all progress</button>
       </div>`;
@@ -405,6 +429,7 @@ export class Menu {
     q<HTMLElement>('[data-node]').forEach(b => b.onclick = () => { this.selected = b.dataset.node || null; this.render(); });
     q<HTMLButtonElement>('[data-goto]').forEach(b => b.onclick = () => { this.tab = 'upgrades'; this.selected = b.dataset.goto!; this.render(); });
     q<HTMLButtonElement>('[data-buy-node]').forEach(b => b.onclick = () => this.buyNode(b.dataset.buyNode!));
+    q<HTMLButtonElement>('[data-next-act]').forEach(b => b.onclick = () => this.startNextAct());
     q<HTMLButtonElement>('[data-start]').forEach(b => b.onclick = () => { this.close(); this.onStart(this.loadout); });
     q<HTMLButtonElement>('[data-refund]').forEach(b => b.onclick = () => {
       const before = this.m;
@@ -416,8 +441,10 @@ export class Menu {
       this.render();
     });
     q<HTMLButtonElement>('[data-reset]').forEach(b => b.onclick = () => {
-      if (b.dataset.armed) { resetSave(); Object.assign(this.save, freshSave()); this.selected = null; this.open(null); return; }
-      b.dataset.armed = '1'; b.textContent = 'Tap again to erase everything';
+      // Two taps: the first arms the button, the second wipes the save and reloads into the very first run.
+      if (b.dataset.armed) { resetSave(); Object.assign(this.save, freshSave()); writeSave(this.save); location.reload(); return; }
+      b.dataset.armed = '1'; b.classList.add('armed'); b.textContent = 'Tap again to erase everything';
+      window.setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.classList.remove('armed'); b.textContent = b.classList.contains('restart') ? '↺ Restart progress' : 'Reset all progress'; } }, 4000);
     });
   }
 }
