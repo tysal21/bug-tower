@@ -9,6 +9,7 @@ import type { Loadout } from '../meta/run';
 import { Reveal, VARIANT_LABEL } from './reveal';
 import { SaveData, Variant, writeSave, resetSave, freshSave } from '../meta/save';
 import { treeLayout, hexPoints } from './treeGraph';
+import { panZoom, fitView, View } from './panzoom';
 import { UI, ICONS, icon, nodeIcon, heroThumb } from '../art/ui';
 const ICONS_URL = (k: string) => ICONS[k] ?? '';
 import { PACK_ART } from '../art';
@@ -31,6 +32,7 @@ export class Menu {
   summary: RunSummary | null = null;
   selected: string | null = null; // skill tree node shown in the detail card
   timer = 0;
+  treeView: View | null = null; // skill tree pan / zoom, kept across renders
 
   constructor(private save: SaveData, private reveal: Reveal, private onStart: (loadout: Loadout) => void) {
     this.root = document.createElement('div');
@@ -132,7 +134,6 @@ export class Menu {
   render() {
     const s = this.summary;
     const scroll = this.root.querySelector('.market')?.scrollTop ?? 0;
-    const graphScroll = this.root.querySelector('.graph-wrap')?.scrollLeft;
     this.root.innerHTML = `
       <div class="screen">
         <header class="topbar">
@@ -145,9 +146,15 @@ export class Menu {
       </div>`;
     const market = this.root.querySelector('.market');
     if (market) market.scrollTop = scroll;
-    // On narrow screens the tree is wider than the panel: start it centred on the seed.
-    const wrap = this.root.querySelector<HTMLElement>('.graph-wrap');
-    if (wrap && wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = graphScroll ?? (wrap.scrollWidth - wrap.clientWidth) / 2;
+    const graph = this.root.querySelector<SVGSVGElement>('.graph');
+    if (graph) {
+      const box = treeLayout().box;
+      this.treeView ??= fitView(box);
+      const pz = panZoom(graph, box, this.treeView);
+      this.root.querySelectorAll<HTMLButtonElement>('[data-zoom]').forEach(b => b.onclick = () => {
+        if (b.dataset.zoom === 'fit') pz.reset(); else pz.zoomBy(b.dataset.zoom === 'in' ? 1.4 : 1 / 1.4);
+      });
+    }
     this.bind();
   }
 
@@ -320,6 +327,12 @@ export class Menu {
           </g>
           ${nodes}
         </svg>
+        <div class="zoom-ctl">
+          <button class="zbtn" data-zoom="in" title="Zoom in (or scroll / pinch)">+</button>
+          <button class="zbtn" data-zoom="out" title="Zoom out">−</button>
+          <button class="zbtn" data-zoom="fit" title="Show the whole tree">${icon('seed')}</button>
+        </div>
+        <span class="zoom-hint muted small">Drag to move · scroll or pinch to zoom</span>
       </div>`;
   }
 
