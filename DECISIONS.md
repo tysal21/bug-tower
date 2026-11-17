@@ -2,6 +2,25 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-17 (Act resets, chapters, Elder Pack, restart button: follow-up to PR #6)
+Builds the parts of Tyler's progression curve that PR #6 left out, and the restart button Tyler asked for.
+
+- **Chapters:** each Frog King win moves you to the next chapter. Inside an act, each chapter gives enemies (boss too) +50% health and +20% spawn rate. The top bar and the Battle button show "Act I · Chapter 2".
+- **Act soft resets:** 3 chapters per act, 3 acts (9 main chapters). Beating an act's last boss opens a gate in the Market: the skill tree and Mastery reset, and you keep **Heartwood**, 1 per 200 Mastery you had invested (held + spent). Each Heartwood is +2% Mastery from runs, forever. Quests, the collection, Frog King wins and pack unlocks stay.
+- **Act mechanics:** Act II enemies take 20% less physical damage (Blight-hardened shells) and have 1.6x health. Act III adds 20% faster enemies, 2.4x health. Shown as a banner at the start of each run. All in `tuning.json` > `chapters`.
+- **Elder Pack:** 9 coins, Epic or Legendary only, unlocks after 2 Frog King wins. This is the 5 to 10+ coin tier, next to the 6-coin Grove Pack.
+- **Cheap packs always on offer:** a fresh shop always holds at least 2 Meadow Packs (`minCheap`), so pricey packs never crowd out the cheap bodies the curve says should win early.
+- **Wave counter:** the HUD and run summary show the wave (one per surge).
+- **Restart progress** (Tyler): a button in the top bar. Tap once to arm it (it turns red), tap again within 4 s to wipe the save and drop straight into the very first run. The old "Reset all progress" link in Collection does the same now.
+- **Mastery slowed** (perKill 1.25 to 0.6, Frog King 250 to 120). With PR #6's rates the bot maxed the whole tree before Act I ended (12 runs), which leaves Act II nothing to rebuild toward and makes the game much shorter than 4 to 7 hours. Early runs still buy several nodes each. Revert these two numbers if early momentum feels too slow.
+- **Progression bot** saved: `npm run dev`, then `npm run bot -- 50 5 http://localhost:5173/` (runs, game speed, address). It aims the Stinger perfectly, rips packs instantly, buys the cheapest glowing cell and the cheapest packs.
+
+**Bot playtest (50 runs):** run 1 = 9 s, runs 2 to 4 = 0:50 to 2:00, runs 5 to 11 = 2 to 3 min, first Frog King on run 13 (4:30). Act I done in 18 runs, about 65 minutes of game time. Act II restarts at 20 s runs and climbs back to a boss kill in 15 runs. Chapter-clearing runs are 4:20 to 4:45. The bot then stalled on chapter 6 (16 runs, 2 to 4.5 min each) with the tree maxed, because it never buys Grove or Elder Packs or swaps helpers. A person who uses the bigger packs should get through. That puts Acts I to III in the 4 to 7 hour range, but it needs real play to confirm.
+
+**Open questions:**
+- The whole tree still maxes out late in each act. A second tree (spending Heartwood) or more nodes per act would give late Acts something to chase.
+- Brood combs (real-time packs between runs) now overlap with the in-run Hatchery.
+
 ## 2026-11-17 (Target progression curve, Tyler's spec)
 Tyler's target: a tight, fast "lose, upgrade, push slightly further" roguelite-incremental. Brisk and focused, about 4 to 7 hours for the main chapters, not a months-long idle grind.
 
@@ -30,7 +49,7 @@ Tyler's target: a tight, fast "lose, upgrade, push slightly further" roguelite-i
 - **Early pack safety:** while your team is empty, a pack's main card is always a helper (a spell as your only card made run 2 as short as run 1).
 
 **Conflicts and pushback:**
-- **Act soft resets are not built.** There is only one chapter, so a reset would wipe the tree and send you back into the same Frog King fight. Recommendation: build it with chapter 2, once there is something new to rebuild against. It also needs a decision on what the permanent currency buys.
+- **Act soft resets are not built.** There is only one chapter, so a reset would wipe the tree and send you back into the same Frog King fight. Recommendation: build it with chapter 2, once there is something new to rebuild against. It also needs a decision on what the permanent currency buys. (Built in the follow-up above.)
 - **Higher-tier packs costing 5 to 10+ coins:** only one higher tier exists (Grove, 6 coins). More tiers come with more chapters.
 - **Brood combs** (real-time packs between runs) stay alongside the new in-run Hatchery. They are a second, slower source and could be cut if two pack generators feel like too much.
 
