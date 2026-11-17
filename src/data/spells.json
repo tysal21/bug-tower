@@ -1,0 +1,5 @@
+{
+  "silkstorm": { "name": "Silk Storm", "tag": "web", "icon": "🕸️", "desc": "Webs every enemy on the field", "cooldown": 25, "webSec": 5 },
+  "embers": { "name": "Rain of Embers", "tag": "ember", "icon": "🔥", "desc": "Burns every enemy and ignites up to 3 webs into Wildfire", "cooldown": 30, "burnSec": 5, "burnDps": 8, "maxWildfires": 3 },
+  "rally": { "name": "Rally Pheromone", "tag": "swarm", "icon": "📣", "desc": "Swarm helpers and your Stinger attack 50% faster", "cooldown": 35, "rallySec": 8, "rallyBonus": 0.5 }
+}
