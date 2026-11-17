@@ -2,6 +2,47 @@
 
 Running log of decisions. Newest first.
 
+## 2026-11-17 (Target progression curve, Tyler's spec)
+Tyler's target: a tight, fast "lose, upgrade, push slightly further" roguelite-incremental. Brisk and focused, about 4 to 7 hours for the main chapters, not a months-long idle grind.
+
+**The curve (Tyler):**
+- **First run: seconds.** Stinger only, the first enemies overwhelm the seed almost at once. The forced loss opens the upgrade loop.
+- **Early runs: 30 s to about 2 min.** One stat bump and a starter unit, a few waves cleared, a trickle of Mastery, then knocked out by the first tougher enemies.
+- **Chapter-clearing runs: 3 to 5+ min.** Passive generation and synergies online, an army built mid-fight, the stage boss beaten.
+- **Shop:** 3 coins per visit. A basic pack costs 2, so the first visit buys 1 pack. Opening 2 packs completes an intro quest worth +1 coin (4 coins = 2 packs a visit). At 5 coins per visit the bundle box unlocks: 3 packs plus bonus currency for 5 coins (vs 6 for three singles). Budget grows through objectives, not enemy drops.
+- **Speed:** almost every early run buys several skill tree nodes and visibly pushes the next run further.
+- **Mid-run snowball:** tree structures generate packs during combat; the bottleneck becomes how fast you can rip packs before the wave lands.
+- **Tiered unlocks:** beating a chapter boss unlocks higher-tier packs (5 to 10+ coins) with stronger pools. Three cheap packs should beat one expensive pack early.
+- **Act soft resets:** every few chapters, the main tree resets in exchange for permanent meta-currency, and you rebuild against tougher enemy mechanics.
+
+**What changed in the greybox to match:**
+- Gold is now **coins**: 3 per visit (`startCoins`), Meadow Pack 2 coins, reroll 1.
+- New quest cell **First Rips** (open 2 packs: +1 coin). It pays out on the same visit. Deeper Pockets still adds +1 coin per level; Pack Rat (40 packs) another +1.
+- **Meadow Box**: 3 packs + 5 Nectar for the next run, 5 coins. Appears once you earn 5 coins a visit. The "Booster Boxes" tree node is gone.
+- **Grove Pack**: 6 coins, better odds, appears after your first Frog King kill. The "Grove Packs" tree node is gone.
+- **Hatchery** (new Brood root): during a run a free sealed pack arrives every 45 / 35 / 25 s. **Big Clutch**: start each run with sealed packs. Space opens sealed packs first, then buys with Nectar.
+- **Packs no longer pause the fight.** While you flip a card the battle runs at 30% speed behind a see-through backdrop (`revealTimeScale`), so ripping fast matters. This replaces the full pause from 2026-11-16.
+- **First run is a forced quick loss:** the seed has 55 HP on run 1 only (140 after), and every run opens with 6 grubs burrowing up near the seed.
+- **Faster progress:** Mastery = 1.25 per kill + 0.3 per second + 12 per Toad Brute + 250 for the Frog King (all in tuning.json). Thick Husk is +25% per level. Helper damage +40% across the board. Spawns start gentler (0.8/s) and end harder (2.8/s).
+- **Chapter length:** Frog King at 4:00 (was 5:00), Toad Brutes at 1:20 and 2:40, so a clearing run is about 4 to 5 minutes. This supersedes the design doc's 15-minute, 12-wave chapter.
+
+**Bot playtest (12 runs, buys the cheapest glowing cells; a human should do better):** run 1 = 9 s (Stinger only), run 2 = 67 s, runs 3 to 5 = 1:18 to 1:34, runs 6 to 12 = about 2 to 3 min with the first Toad Brute down. Every run after the first bought 3 to 11 nodes. Coins went 3, 4, 6, 7, 8. Mid-run packs went from 4 to 15 per run once the Hatchery was bought. The bot never beat the Frog King in 12 runs, which fits a 4 to 7 hour game but is worth checking with real play.
+- **Early pack safety:** while your team is empty, a pack's main card is always a helper (a spell as your only card made run 2 as short as run 1).
+
+**Conflicts and pushback:**
+- **Act soft resets are not built.** There is only one chapter, so a reset would wipe the tree and send you back into the same Frog King fight. Recommendation: build it with chapter 2, once there is something new to rebuild against. It also needs a decision on what the permanent currency buys.
+- **Higher-tier packs costing 5 to 10+ coins:** only one higher tier exists (Grove, 6 coins). More tiers come with more chapters.
+- **Brood combs** (real-time packs between runs) stay alongside the new in-run Hatchery. They are a second, slower source and could be cut if two pack generators feel like too much.
+
+## 2026-11-17 (PixelLab UI, map and icons, same PR as the sprites)
+- **One shared "Heartseed" palette** (24 colours: bark, moss, honey-gold, cream, berry, blight purple, rare blue, spell teal). Every UI piece is generated on it and then snapped to it exactly (`scripts/art/build_ui.py`), so menus, HUD and sprites look like one hand-made set.
+- **UI pieces** (PixelLab Generate UI, 4 options each, best one picked in `PICKS`): bark panel frame, inset slot, detail box, gold / moss / battle buttons, tab, 5 skill-tree cells (locked, open, owned, quest, seed), card back, 4 rarity card frames, health and boss bar frames, spell slot. Used as CSS 9-slice `border-image` in the menus and Phaser nine-slices in battle. Hover / pressed states are brightness and a 2 px press instead of extra generations, so they always match.
+- **43 icons** (pixflux, 1 generation each) replace every emoji: all skill tree nodes, spells, gold, Mastery, Nectar, Foil, Holo, lock, quest scroll. Legends cells and cards show the hero sprite.
+- **Battle map:** a PixelLab forest-floor clearing (320x180, drawn 4x), dimmed and desaturated so units stay readable. **Menu backdrop:** dark bark texture.
+- **Pixel font:** Pixelify Sans (open font, bundled from npm) for menus and the battle HUD.
+- Cost: about 254 generations (UI pieces are 10 each). Plan had 4,242 left afterwards.
+- Screens: `heartseed/art/menu-pixellab-ui.png`, `battle-pixellab-map.png`, `card-pixellab.png`.
+
 ## 2026-11-17 (PixelLab art, PR on top of #4)
 - **All 17 sprites now come from PixelLab** (pixflux for the pose, animate-with-text v3 for the second frame). Same file names and 2-frame strips as the hand-drawn set; frames are about 2x bigger and drawn at 1x, so on-screen size is about the same with much more detail.
 - Generator: `scripts/art/pixellab.py` (prompts, sizes and frame picks in one table). Raw outputs cached in `scripts/art/pixellab/`, so reruns only spend generations on sprites you delete or `--force`. Cost about 2 generations per sprite; 42 used in total.

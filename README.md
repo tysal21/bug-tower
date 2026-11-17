@@ -33,6 +33,7 @@ Useful extras: add `?speed=3` to the address to run the game 3x faster, `?test` 
 - `src/meta/run.ts` - the team and spells you carry for one run.
 - `src/data/spells.json` - the three spells.
 - `scripts/art/pixellab.py` - regenerates the sprites with PixelLab (needs a PixelLab API token and Pillow).
+- `scripts/art/pixellab_ui.py`, `pixellab_bg.py` - generate UI pieces, icons, battle map and menu backdrop with PixelLab; `build_ui.py` picks the options and snaps them to the shared palette into `src/art/ui/`.
 - `src/ui/treeGraph.ts` - lays the skill tree out as a honeycomb around the Heartseed.
 - `src/meta/` - saving progress, skill tree effects, shop rolls.
 - `src/data/shop.json`, `src/data/tree.json` - shop items, pack odds and skill tree nodes.

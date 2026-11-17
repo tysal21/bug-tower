@@ -7,6 +7,7 @@ import type { Loadout } from '../meta/run';
 import type { SaveData } from '../meta/save';
 import type { Reveal } from '../ui/reveal';
 import { addArt, loadArt, makeAnims } from '../art';
+import { loadUi, crispUi, PIXEL_FONT } from '../art/ui';
 
 export const W = 1280;
 export const H = 720;
@@ -21,7 +22,7 @@ function homeFor(i: number, slots: number) {
 export interface RunResult { won: boolean; seconds: number; kills: number; miniBosses: number; quests: string[] }
 export interface RunSetup { loadout: Loadout; meta: MetaStats; save: SaveData; reveal: Reveal; onEnd?: (r: RunResult) => void }
 
-interface SpellButton { id: string; box: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text }
+interface SpellButton { id: string; box: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; frame: Phaser.GameObjects.NineSlice; ic: Phaser.GameObjects.Image }
 const BTN = { w: 190, h: 44 };
 
 interface Trap { x: number; y: number; r: number; until: number; gfx: Phaser.GameObjects.Arc }
@@ -58,6 +59,9 @@ export class BattleScene extends Phaser.Scene {
   spellCd: Record<string, { left: number; max: number }> = {};
   spellButtons: SpellButton[] = [];
   packBox!: Phaser.GameObjects.Rectangle;
+  packFrame!: Phaser.GameObjects.NineSlice;
+  seedFrame?: Phaser.GameObjects.NineSlice;
+  bossFrame?: Phaser.GameObjects.NineSlice;
   packLabel!: Phaser.GameObjects.Text;
   maxSeedHp = TUNING.seedHp;
   onEnd: (r: RunResult) => void = () => {};
@@ -84,10 +88,10 @@ export class BattleScene extends Phaser.Scene {
     this.onEnd = data.onEnd ?? (() => {});
   }
 
-  preload() { loadArt(this); }
+  preload() { loadArt(this); loadUi(this); }
 
   create() {
-    makeAnims(this);
+    makeAnims(this); crispUi(this);
     const q = new URLSearchParams(location.search);
     this.maxHelpers = this.meta.maxHelpers;
     this.enemies = []; this.heroes = Array.from({ length: this.maxHelpers }, () => null);
@@ -96,6 +100,7 @@ export class BattleScene extends Phaser.Scene {
     this.seedHp = this.maxSeedHp;
     this.spawnDebt = 0; this.nextSurge = TUNING.run.surgeEverySec; this.boss = null; this.bossSpawned = false;
     this.bossTongue = 0; this.bossFlop = 0; this.traps = [];
+    this.seedFrame = undefined; this.bossFrame = undefined;
     this.state = 'playing'; this.paused = false; this.time_ = 0;
     this.stats = { kills: 0, wildfires: 0, executes: 0, stingerHits: 0, miniBosses: 0, packs: 0 };
     this.nectar = 0; this.packsBought = 0; this.miniIdx = 0; this.questsDone = [];
@@ -110,18 +115,18 @@ export class BattleScene extends Phaser.Scene {
     if (q.has('nectar')) this.nectar = Number(q.get('nectar')) || 0;
 
     // Ground: a top-down meadow with a worn circle around the seed.
-    this.add.rectangle(W / 2, H / 2, W, H, 0x23301c);
-    this.add.circle(SEED.x, SEED.y, TUNING.heroLeash, 0x283522); // area helpers defend
-    this.add.circle(SEED.x, SEED.y, 170, 0x2d3a22);
+    // PixelLab forest-floor clearing (320x180, drawn 4x), with a faint ring for the area helpers defend.
+    this.add.image(0, 0, 'ui_bg_map').setOrigin(0).setScale(W / 320, H / 180).setDepth(-1);
+    this.add.circle(SEED.x, SEED.y, TUNING.heroLeash).setStrokeStyle(2, 0xf2c94c, 0.12);
     // The seed's footprint stays a circle (enemies stop at its edge); the sprite sits on top.
     this.seedBody = this.add.circle(SEED.x, SEED.y, SEED.r, 0x1a2414, 0.6).setDepth(1);
     this.seedSprite = addArt(this, 'heartseed', SEED.x, SEED.y - 10).setDepth(1.2);
 
     this.seedBar = this.add.graphics().setDepth(9);
     this.bossBar = this.add.graphics().setDepth(9);
-    this.bossLabel = this.add.text(W / 2, 40, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffd76e' }).setOrigin(0.5, 0).setDepth(9);
-    this.hud = this.add.text(16, 12, '', { fontFamily: 'monospace', fontSize: '16px', color: '#f0e6d2' }).setDepth(9);
-    this.banner = this.add.text(W / 2, 150, '', { fontFamily: 'monospace', fontSize: '40px', color: '#ffffff', align: 'center', stroke: '#000', strokeThickness: 5 })
+    this.bossLabel = this.add.text(W / 2, 40, '', { fontFamily: PIXEL_FONT, fontSize: '14px', color: '#ffd76e' }).setOrigin(0.5, 0).setDepth(9);
+    this.hud = this.add.text(16, 12, '', { fontFamily: PIXEL_FONT, fontSize: '16px', color: '#f0e6d2' }).setDepth(9);
+    this.banner = this.add.text(W / 2, 150, '', { fontFamily: PIXEL_FONT, fontSize: '40px', color: '#ffffff', align: 'center', stroke: '#000', strokeThickness: 5 })
       .setOrigin(0.5).setDepth(15);
     this.reticle = this.add.circle(0, 0, TUNING.stinger.hitRadius).setStrokeStyle(2, 0xff4d6d, 0.8).setVisible(false).setDepth(8);
 
@@ -155,15 +160,17 @@ export class BattleScene extends Phaser.Scene {
       const h = this.heroes[i]!;
       h.copies = m.copies; h.stars = m.stars; h.variant = m.variant ?? 'standard'; h.refresh();
     });
-    for (const b of this.spellButtons) { b.box.destroy(); b.fill.destroy(); b.label.destroy(); }
+    for (const b of this.spellButtons) { b.box.destroy(); b.fill.destroy(); b.label.destroy(); b.frame.destroy(); b.ic.destroy(); }
     this.spellButtons = this.loadout.spells.map((sp, i) => {
       const x = 16 + i * (BTN.w + 10), y = H - BTN.h - 14;
       const color = TAG_COLOR[SPELLS[sp.id].tag];
       const box = this.add.rectangle(x, y, BTN.w, BTN.h, 0x1a2013, 0.92).setOrigin(0).setStrokeStyle(2, color).setDepth(10)
         .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.castSpell(i));
       const fill = this.add.rectangle(x, y, BTN.w, BTN.h, 0x000000, 0.6).setOrigin(0).setDepth(11);
-      const label = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
-      return { id: sp.id, box, fill, label };
+      const frame = this.add.nineslice(x, y, 'ui_inset', undefined, BTN.w, BTN.h, 8, 8, 8, 8).setOrigin(0).setDepth(11.5);
+      const ic = this.add.image(x + 22, y + BTN.h / 2, 'icon_' + sp.id).setDepth(12);
+      const label = this.add.text(x + BTN.w / 2 + 14, y + BTN.h / 2, '', { fontFamily: PIXEL_FONT, fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
+      return { id: sp.id, box, fill, label, frame, ic };
     });
   }
 
@@ -189,7 +196,7 @@ export class BattleScene extends Phaser.Scene {
       }
     }
     if (d.rallySec) { this.rallyUntil = this.time_ + d.rallySec * power; this.rallyBonus = d.rallyBonus ?? 0; }
-    this.showBanner(`${d.icon} ${d.name}!`);
+    this.showBanner(`${d.name}!`);
     this.cameras.main.flash(180, ...this.rgb(TAG_COLOR[d.tag]));
   }
 
@@ -217,8 +224,9 @@ export class BattleScene extends Phaser.Scene {
     const x = W - BTN.w - 16, y = H - BTN.h - 14;
     this.packBox = this.add.rectangle(x, y, BTN.w, BTN.h, 0x241f14, 0.92).setOrigin(0).setStrokeStyle(2, 0xf2c94c).setDepth(10)
       .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.buyPack());
-    this.packLabel = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
-    this.packBox.setVisible(TUNING.nectar.enabled); this.packLabel.setVisible(TUNING.nectar.enabled);
+    this.packLabel = this.add.text(x + BTN.w / 2, y + BTN.h / 2, '', { fontFamily: PIXEL_FONT, fontSize: '13px', color: '#f0e6d2', align: 'center' }).setOrigin(0.5).setDepth(12);
+    this.packFrame = this.add.nineslice(x, y, 'ui_btn_gold', undefined, BTN.w, BTN.h, 10, 10, 8, 8).setOrigin(0).setDepth(11);
+    this.packBox.setVisible(TUNING.nectar.enabled); this.packLabel.setVisible(TUNING.nectar.enabled); this.packFrame.setVisible(TUNING.nectar.enabled);
     // Meadow Pack sprite peeking over the button's left edge.
     this.add.sprite(x - 8, y + BTN.h / 2 - 4, 'pack_meadow', 0).setScale(0.75).setAngle(-12).setDepth(12).setVisible(TUNING.nectar.enabled).play('pack_meadow-idle');
   }
@@ -611,22 +619,25 @@ export class BattleScene extends Phaser.Scene {
     this.hud.setText(`${this.clock(this.time_)}   ${timer}   Kills ${this.stats.kills}${nectarOn ? `   Nectar ${Math.floor(this.nectar)}` : ''}${this.rallying ? '   RALLY!' : ''}`);
     if (nectarOn) {
       const can = this.nectar >= this.packPrice;
-      this.packLabel.setText(`Open a pack [Space]\n${Math.floor(this.nectar)} / ${this.packPrice} Nectar`).setColor(can ? '#1b1405' : '#a59a84');
-      this.packBox.setFillStyle(can ? 0xf2c94c : 0x241f14, 0.92);
+      this.packLabel.setText(`Open a pack [Space]\n${Math.floor(this.nectar)} / ${this.packPrice} Nectar`).setColor(can ? '#fdf2a8' : '#a59a84');
+      this.packBox.setFillStyle(can ? 0x4a2c1e : 0x2a1d16, 0.95);
+      this.packFrame.setAlpha(can ? 1 : 0.55);
     }
     this.bossBar.clear();
     this.bossLabel.setText('');
+    this.bossFrame ??= this.add.nineslice(W / 2 - 262, 54, 'ui_boss_frame', undefined, 524, 24, 14, 14, 6, 6).setOrigin(0).setDepth(8.9);
+    this.bossFrame.setVisible(!!this.boss?.alive);
     if (this.boss?.alive) {
       const b = this.boss, bw = 500, bx = W / 2 - bw / 2, by = 60;
       this.bossLabel.setText(b.hp / b.maxHp < TUNING.boss.enrageBelow ? 'FROG KING (ENRAGED)' : 'FROG KING');
       this.bossBar.fillStyle(0x000000, 0.6).fillRect(bx, by, bw, 12);
-      this.bossBar.fillStyle(0xd4af37).fillRect(bx, by, (bw * Math.max(0, b.hp)) / b.maxHp, 12);
+      this.bossBar.fillStyle(0xb03135).fillRect(bx, by, (bw * Math.max(0, b.hp)) / b.maxHp, 12);
     }
     const bw = 300, x = W - bw - 16, y = 16; // seed health, top right
     this.seedBar.clear();
     this.seedBar.fillStyle(0x000000, 0.6).fillRect(x, y, bw, 14);
-    this.seedBar.fillStyle(0x9be36d).fillRect(x, y, (bw * this.seedHp) / this.maxSeedHp, 14);
-    this.seedBar.lineStyle(1, 0xf0e6d2, 0.5).strokeRect(x, y, bw, 14);
+    this.seedBar.fillStyle(0xaecb50).fillRect(x, y, (bw * this.seedHp) / this.maxSeedHp, 14);
+    this.seedFrame ??= this.add.nineslice(x - 10, y - 5, 'ui_bar_frame', undefined, bw + 20, 24, 12, 12, 6, 6).setOrigin(0).setDepth(8.9);
   }
 
   clock(sec: number) {
@@ -635,7 +646,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   floatText(x: number, y: number, text: string, color: string) {
-    const t = this.add.text(x, y, text, { fontFamily: 'monospace', fontSize: '14px', color, stroke: '#000', strokeThickness: 3 })
+    const t = this.add.text(x, y, text, { fontFamily: PIXEL_FONT, fontSize: '14px', color, stroke: '#000', strokeThickness: 3 })
       .setOrigin(0.5).setDepth(8);
     this.tweens.add({ targets: t, y: y - 30, alpha: 0, duration: 700, onComplete: () => t.destroy() });
   }
