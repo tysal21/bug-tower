@@ -115,9 +115,9 @@
   "startCoins": 3,
   "mastery": {
     "note": "Mastery earned per run = perKill x kills + perSec x seconds survived + miniBoss each + boss for the Frog King, times Harvest.",
-    "perKill": 1.25,
+    "perKill": 0.6,
     "perSec": 0.3,
-    "boss": 250
+    "boss": 120
   },
   "firstRun": {
     "note": "Your very first run is a forced, quick loss that opens the Market and skill tree. The seed starts this weak only on run 1.",
@@ -126,8 +126,8 @@
   "chapters": {
     "note": "Each Frog King you beat moves you to the next chapter. Inside an act, each chapter adds hpPerChapter enemy health (boss too) and spawnPerChapter spawn rate. After perAct chapters the next menu starts the next Act: the skill tree and Mastery reset and you keep Heartwood (1 per heartwoodPer Mastery you had invested). Each Heartwood gives +heartwoodMastery Mastery from runs, forever. acts[i]: hpMult = enemy health, armor = extra armor on every enemy, speedMult = enemy speed, mechanic = the line shown at the start of a run.",
     "perAct": 3,
-    "hpPerChapter": 0.3,
-    "spawnPerChapter": 0.12,
+    "hpPerChapter": 0.5,
+    "spawnPerChapter": 0.2,
     "heartwoodPer": 200,
     "heartwoodMastery": 0.02,
     "acts": [
