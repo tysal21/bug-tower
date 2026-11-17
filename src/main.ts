@@ -5,6 +5,9 @@ import { Reveal } from './ui/reveal';
 import { loadSave, writeSave } from './meta/save';
 import { metaStats, masteryFor } from './meta/meta';
 import type { Loadout } from './meta/run';
+import { installUiCss } from './art/ui';
+
+installUiCss();
 
 const save = loadSave();
 const game = new Phaser.Game({
@@ -38,7 +41,12 @@ const menu = new Menu(save, reveal, startRun);
 (window as unknown as { __save: typeof save }).__save = save;
 
 // The very first run starts straight away with only the Stinger. After that, start at the menu.
-game.events.once('ready', () => {
+// Wait for the pixel font so Phaser's canvas text doesn't draw in a fallback font.
+const fontsReady = Promise.race([
+  Promise.all(['400', '700'].map(w => document.fonts.load(`${w} 16px "Pixelify Sans"`))),
+  new Promise(r => setTimeout(r, 2500)),
+]);
+game.events.once('ready', () => fontsReady.then(() => {
   if (save.runs === 0) startRun({ team: [], spells: [] });
   else menu.open(null);
-});
+}));

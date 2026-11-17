@@ -1,4 +1,5 @@
 // The card reveal: face-down card, rarity glow, tap to flip, then keep / swap / discard.
+import { icon, heroThumb } from '../art/ui';
 // Used by the Market between runs and by Nectar packs opened in the middle of a run.
 import { HEROES, SPELLS, TAG_COLOR } from '../game/data';
 import { MetaStats, Pull, bump, variantDamage } from '../meta/meta';
@@ -103,12 +104,12 @@ export class Reveal {
       <div class="reveal">
         <p class="muted">${this.queue.length > 1 ? `${this.queue.length} cards left` : 'Last card'} · tap the card (or press Space) to flip it</p>
         <div class="card ${rarity} ${pull.variant}" data-card>
-          <div class="back"><span>?</span></div>
+          <div class="back"></div>
           <div class="face" style="--tag:${hex(TAG_COLOR[tag])}">
-            ${spell ? `<span class="spell-icon">${SPELLS[pull.id].icon}</span>` : ''}
+            ${spell ? `<span class="spell-icon">${icon(pull.id, SPELLS[pull.id].icon)}</span>` : `<img class="hero-art" src="${heroThumb(pull.id)}" alt="">`}
             <b>${name}</b><span>${rarity.toUpperCase()}</span><span>${tag === 'none' ? '' : tag.toUpperCase()}</span>
             ${spell ? `<small>${SPELLS[pull.id].desc}</small>` : ''}
-            ${fancy ? `<strong class="vtag">${fancy}</strong>` : ''}<em>${note}</em>
+            ${fancy ? `<strong class="vtag">${icon(pull.variant)} ${fancy}</strong>` : ''}<em>${note}</em>
           </div>
         </div>
         <div class="reveal-actions" hidden>${actions}</div>

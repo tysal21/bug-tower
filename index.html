@@ -177,6 +177,88 @@
       }
       @media (max-width: 480px) { .offers { gap: 6px; } .team { grid-template-columns: repeat(3, 1fr); } .team.spells { grid-template-columns: repeat(2, 1fr); } #menu button.battle { padding: 10px 22px; } }
     </style>
+    <style>
+      /* ---- PixelLab UI skin (art in src/art/ui/, exposed as --ui-* by src/art/ui.ts) ---- */
+      #menu, #reveal { font-family: "Pixelify Sans", ui-monospace, monospace; font-size: 15px; image-rendering: pixelated; }
+      #menu { background: #10140c var(--ui-bg-menu) repeat; background-size: 256px; }
+      #menu h1, #menu h2, #menu h3, .blabel, .lvl text, :is(#menu, #reveal) button { font-family: inherit; }
+      #menu h1 { font-size: 26px; color: #aecb50; text-shadow: 2px 2px 0 #140f0c; }
+      #menu h2, #menu h3 { letter-spacing: .08em; color: #f2c94c; text-shadow: 1px 1px 0 #140f0c; }
+      .px-icon { width: 1.5em; height: 1.5em; object-fit: contain; image-rendering: pixelated; vertical-align: -.4em; margin-right: .15em; }
+      .panel { background: none; border: 26px solid transparent; border-image: var(--ui-panel) 20 fill / 26px stretch; border-radius: 0; margin: -6px; }
+      .panel-head { padding: 0 2px 8px; border-bottom: 2px solid #4a2c1e; }
+      .market > :not(.panel-head) { margin: 0 2px; }
+      .progress-foot { padding: 8px 2px 0; border-top: 2px solid #4a2c1e; }
+      /* buttons: gold (default), moss (secondary), battle, tabs */
+      :is(#menu, #reveal) button { background: none; border: 9px solid transparent; border-image: var(--ui-btn-gold) 9 fill / 9px stretch;
+        border-radius: 0; color: #fdf2a8; padding: 1px 8px; text-shadow: 1px 1px 0 #140f0c; transition: filter .1s, transform .1s; }
+      :is(#menu, #reveal) button:not(:disabled):hover { filter: brightness(1.18); }
+      :is(#menu, #reveal) button:not(:disabled):active { transform: translateY(2px); filter: brightness(.9); }
+      :is(#menu, #reveal) button:disabled { background: none; color: #a59a84; filter: grayscale(.85) brightness(.65); }
+      :is(#menu, #reveal) button.secondary { background: none; border-image: var(--ui-btn-moss) 9 fill / 9px stretch; color: #140f0c; text-shadow: 1px 1px 0 #aecb5088; }
+      #menu button.link { border: 0; border-image: none; text-shadow: none; }
+      #menu button.battle { background: none; border: 16px solid transparent; border-image: var(--ui-btn-battle) 15 fill / 16px stretch; border-radius: 0;
+        box-shadow: none; padding: 2px 22px; font: 700 26px/1 "Pixelify Sans", monospace; text-shadow: 2px 2px 0 #5e1f2d; }
+      #menu button.battle:active { box-shadow: none; }
+      .progress nav { background: none; gap: 2px; padding: 0; }
+      #menu .progress nav button { border-image: none; border: 7px solid transparent; color: #a59a84; padding: 0 8px; }
+      #menu .progress nav button.on { background: none; border-image: var(--ui-tab) 6 fill / 7px stretch; color: #fdf2a8; }
+      #menu .detail .close { border: 0; border-image: none; }
+      #menu .detail button[data-buy-node] { background: none; color: #fdf2a8; font-weight: 700; }
+      #menu .detail button[data-buy-node]:disabled { background: none; color: #a59a84; }
+      /* market */
+      #menu .offer { background: none; border: 10px solid transparent; border-image: var(--ui-inset) 9 fill / 10px stretch; border-radius: 0; padding: 4px 2px 26px; }
+      #menu .offer:not(:disabled):hover { border-color: transparent; }
+      #menu .offer:disabled { background: none; }
+      .pack-art { width: 48px; height: 64px; }
+      .pack-art i, .grove .pack-art i { border: 0; border-radius: 0; box-shadow: none; background: var(--pack) 0 0 / 200% 100% no-repeat; image-rendering: pixelated; filter: drop-shadow(2px 3px 0 #0008); }
+      .pack-art i::after { display: none; }
+      .price { clip-path: none; border-radius: 0; background: #2a1d16; color: #f2c94c; border: 2px solid #c88a2a; border-bottom: 0; padding: 0 8px; }
+      .price .px-icon { width: 18px; height: 18px; margin: 0; vertical-align: -4px; }
+      .coin .px-icon, #menu .mastery .px-icon { width: 22px; height: 22px; }
+      .pip { width: 9px; height: 9px; border-radius: 0; }
+      .chip, .chip.foil, .chip.holo { border: 8px solid transparent; border-image: var(--ui-inset) 9 fill / 8px stretch; border-radius: 0; background: none;
+        padding: 0 2px; box-shadow: inset 0 -3px 0 var(--tag, transparent); }
+      .chip.empty, .chip.spell.empty { border: 8px solid transparent; border-image: var(--ui-inset) 9 fill / 8px stretch; opacity: .45; }
+      .chip.spell { border-image: var(--ui-spell-slot) 10 fill / 10px stretch; border-width: 10px; }
+      .chip.foil { box-shadow: inset 0 0 0 2px #f0e6d2, inset 0 -3px 0 var(--tag); } .chip.holo { box-shadow: inset 0 0 0 2px #a855f7, inset 0 -3px 0 var(--tag); }
+      .comb-text .px-icon { width: 28px; height: 28px; margin: 0; }
+      .detail { background: none; border: 16px solid transparent; border-image: var(--ui-detail) 16 fill / 16px stretch; border-radius: 0; padding: 0 4px; }
+      .detail-icon { background: none; border: 0; }
+      .detail-icon .px-icon { width: 40px; height: 40px; margin: 0; }
+      /* skill tree: PixelLab hex cells and icons; the polygon stays as the click target */
+      .graph image { image-rendering: pixelated; }
+      .tnode .cell, .tnode:hover .cell, .tnode.owned .cell, .tnode.maxed .cell, .tnode.locked .cell, .tnode.quest .cell, .tnode.quest.maxed .cell { fill: transparent; stroke: none; }
+      .tnode .cellimg { transition: filter .15s; }
+      .tnode:hover .cellimg { filter: brightness(1.25); }
+      .tnode.maxed .cellimg { filter: drop-shadow(0 0 .06px #fdf2a8) brightness(1.1); }
+      .tnode.locked .cellimg { filter: brightness(.55) saturate(.4); }
+      .tnode.locked .nicon { opacity: .4; filter: grayscale(.7); }
+      .tnode.quest .nicon { opacity: .95; }
+      .tnode.quest.maxed .cellimg { filter: drop-shadow(0 0 .08px #f2c94c); }
+      .seed:hover image { filter: brightness(1.2); }
+      .blabel { font-size: .34px; paint-order: stroke; stroke: #140f0c; stroke-width: .05px; }
+      .lvl text { font-family: "Pixelify Sans", monospace; }
+      /* cards: PixelLab card back and rarity frames */
+      .card { width: 230px; height: 318px; }
+      .card .back { background: var(--ui-card-back) center / 100% 100% no-repeat; border: 0; image-rendering: pixelated; }
+      .card .face, .ccard { --frame: var(--ui-card-common); border: 0; border-radius: 0; color: #f0e6d2; text-shadow: 1px 1px 0 #140f0c;
+        background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--tag, #46692c) 60%, #2a1d16), #1b120d 75%); background-clip: content-box; }
+      .card .face { padding: 44px 36px; font-size: 13px; line-height: 1.25; gap: 4px; overflow-wrap: anywhere; } .ccard { padding: 18px 15px; }
+      .card .face::after, .ccard::after { content: ''; position: absolute; inset: 0; background: var(--frame) center / 100% 100% no-repeat; image-rendering: pixelated; pointer-events: none; }
+      .card.rare .face, .ccard.r-rare { --frame: var(--ui-card-rare); }
+      .card.epic .face, .ccard.r-epic { --frame: var(--ui-card-epic); }
+      .card.legendary .face, .ccard.r-legendary { --frame: var(--ui-card-legendary); }
+      .ccard.unknown { background: radial-gradient(circle, #2a1d16, #140f0c 75%); background-clip: content-box; color: #6e4426; }
+      .ccard .q { color: #6e4426; }
+      .card.spell .face, .ccard.spell { --frame: var(--ui-card-common); border: 0; }
+      .hero-art { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #0008); }
+      .ccard .hero-art { width: 52px; height: 52px; }
+      .spell-icon .px-icon { width: 56px; height: 56px; margin: 0; }
+      .card .vtag { background: #140f0c; border: 1px solid #c88a2a; border-radius: 0; }
+      .card .vtag .px-icon { width: 16px; height: 16px; vertical-align: -3px; }
+      .odds th, .odds td { border-bottom-color: #4a2c1e; }
+    </style>
   </head>
   <body>
     <div id="game"></div>

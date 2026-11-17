@@ -34,6 +34,15 @@ Tyler's target: a tight, fast "lose, upgrade, push slightly further" roguelite-i
 - **Higher-tier packs costing 5 to 10+ coins:** only one higher tier exists (Grove, 6 coins). More tiers come with more chapters.
 - **Brood combs** (real-time packs between runs) stay alongside the new in-run Hatchery. They are a second, slower source and could be cut if two pack generators feel like too much.
 
+## 2026-11-17 (PixelLab UI, map and icons, same PR as the sprites)
+- **One shared "Heartseed" palette** (24 colours: bark, moss, honey-gold, cream, berry, blight purple, rare blue, spell teal). Every UI piece is generated on it and then snapped to it exactly (`scripts/art/build_ui.py`), so menus, HUD and sprites look like one hand-made set.
+- **UI pieces** (PixelLab Generate UI, 4 options each, best one picked in `PICKS`): bark panel frame, inset slot, detail box, gold / moss / battle buttons, tab, 5 skill-tree cells (locked, open, owned, quest, seed), card back, 4 rarity card frames, health and boss bar frames, spell slot. Used as CSS 9-slice `border-image` in the menus and Phaser nine-slices in battle. Hover / pressed states are brightness and a 2 px press instead of extra generations, so they always match.
+- **43 icons** (pixflux, 1 generation each) replace every emoji: all skill tree nodes, spells, gold, Mastery, Nectar, Foil, Holo, lock, quest scroll. Legends cells and cards show the hero sprite.
+- **Battle map:** a PixelLab forest-floor clearing (320x180, drawn 4x), dimmed and desaturated so units stay readable. **Menu backdrop:** dark bark texture.
+- **Pixel font:** Pixelify Sans (open font, bundled from npm) for menus and the battle HUD.
+- Cost: about 254 generations (UI pieces are 10 each). Plan had 4,242 left afterwards.
+- Screens: `heartseed/art/menu-pixellab-ui.png`, `battle-pixellab-map.png`, `card-pixellab.png`.
+
 ## 2026-11-17 (PixelLab art, PR on top of #4)
 - **All 17 sprites now come from PixelLab** (pixflux for the pose, animate-with-text v3 for the second frame). Same file names and 2-frame strips as the hand-drawn set; frames are about 2x bigger and drawn at 1x, so on-screen size is about the same with much more detail.
 - Generator: `scripts/art/pixellab.py` (prompts, sizes and frame picks in one table). Raw outputs cached in `scripts/art/pixellab/`, so reruns only spend generations on sprites you delete or `--force`. Cost about 2 generations per sprite; 42 used in total.

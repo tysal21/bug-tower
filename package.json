@@ -16,6 +16,7 @@
   },
   "homepage": "https://github.com/tysal21/bug-tower#readme",
   "dependencies": {
+    "@fontsource/pixelify-sans": "^5.3.0",
     "phaser": "^3.90.0"
   },
   "devDependencies": {

@@ -9,6 +9,9 @@ import type { Loadout } from '../meta/run';
 import { Reveal, VARIANT_LABEL } from './reveal';
 import { SaveData, Variant, writeSave, resetSave, freshSave } from '../meta/save';
 import { treeLayout, hexPoints } from './treeGraph';
+import { UI, ICONS, icon, nodeIcon, heroThumb } from '../art/ui';
+const ICONS_URL = (k: string) => ICONS[k] ?? '';
+import { PACK_ART } from '../art';
 
 export interface RunSummary { seconds: number; kills: number; mastery: number; won: boolean; quests: string[] }
 
@@ -151,8 +154,8 @@ export class Menu {
   currencyHtml() {
     const pips = Array.from({ length: this.m.maxGold }, (_, i) => `<span class="pip ${i < this.gold ? 'full' : ''}"></span>`).join('');
     return `<div class="purse">
-      <span class="coin" title="Coins: refill to full every visit">${pips}<b>${this.gold}</b></span>
-      <span class="mastery" title="Mastery: earned in runs, spent in the skill tree">✦ <b>${this.save.mastery}</b></span>
+      <span class="coin" title="Coins: refill to full every visit">${pips}${icon('gold')}<b>${this.gold}</b></span>
+      <span class="mastery" title="Mastery: earned in runs, spent in the skill tree">${icon('mastery')}<b>${this.save.mastery}</b></span>
     </div>`;
   }
 
@@ -167,20 +170,20 @@ export class Menu {
       const odds = packOdds(it.packType, m);
       return `<button class="offer ${it.packType} ${it.packs > 1 ? 'bundle' : ''}" data-buy="${i}" ${can ? '' : 'disabled'}
           title="Rare+ ${pct(100 - odds.common)} · Legendary ${pct(odds.legendary)}">
-        <div class="pack-art">${it.packs > 1 ? '<i></i><i></i><i></i>' : '<i></i>'}</div>
+        <div class="pack-art" style="--pack:url('${PACK_ART[it.packType as 'meadow' | 'grove']}')">${it.packs > 1 ? '<i></i><i></i><i></i>' : '<i></i>'}</div>
         <div class="offer-name">${it.name}</div>
         <div class="offer-sub">${it.packs > 1 ? `${it.packs} packs` : '1 pack'}${it.packType === 'grove' ? ' · rare odds' : ''}${it.bonusNectar ? ` · +${it.bonusNectar} Nectar` : ''} ${deal}</div>
         <div class="offer-odds">Rare+ ${pct(100 - odds.common)}</div>
-        <span class="price">${it.cost} <span class="pip full"></span></span>
+        <span class="price">${it.cost} ${icon('gold')}</span>
       </button>`;
     }).join('');
-    const rerollLabel = this.rerolls > 0 ? `↻ Reroll <small>free ×${this.rerolls}</small>` : `↻ Reroll <small>${SHOP.rerollCost} coin</small>`;
+    const rerollLabel = this.rerolls > 0 ? `${icon('reroll')} Reroll <small>free ×${this.rerolls}</small>` : `${icon('reroll')} Reroll <small>${SHOP.rerollCost} coin</small>`;
     const canReroll = this.rerolls > 0 || this.gold >= SHOP.rerollCost;
     const spells = Array.from({ length: TUNING.spells.slots }, (_, i) => {
       const sp = this.loadout.spells[i];
       if (!sp) return `<div class="chip empty spell"><span class="muted small">spell</span></div>`;
       const d = SPELLS[sp.id];
-      return `<div class="chip spell" style="--tag:${hex(TAG_COLOR[d.tag])}" title="${d.name}: ${d.desc}"><span>${d.icon} ${d.name}</span><span class="stars">${'★'.repeat(sp.stars)}</span></div>`;
+      return `<div class="chip spell" style="--tag:${hex(TAG_COLOR[d.tag])}" title="${d.name}: ${d.desc}"><span>${icon(sp.id, d.icon)} ${d.name}</span><span class="stars">${'★'.repeat(sp.stars)}</span></div>`;
     }).join('');
     const team = Array.from({ length: m.maxHelpers }, (_, i) => {
       const t = this.loadout.team[i];
@@ -199,20 +202,20 @@ export class Menu {
         <div class="sub-head"><h3>Your team this run</h3><span class="muted small">lasts one run · duplicates add ★</span></div>
         <div class="team">${team}</div>
         <div class="team spells">${spells}</div>
-        <p class="muted small nectar-note">🍯 Kills drop Nectar. Spend it on more packs in the middle of a run.</p>
+        <p class="muted small nectar-note">${icon('nectar')} Kills drop Nectar. Spend it on more packs in the middle of a run.</p>
       </section>`;
   }
 
   combsHtml(m: MetaStats) {
     if (!m.combs) {
       return `<button class="comb locked" data-goto="comb"><svg viewBox="-1 -1 2 2"><polygon points="${hexPoints(0.92)}"/></svg>
-        <span class="comb-text">🔒<small>Unlock in the Brood branch</small></span></button>`;
+        <span class="comb-text">${icon('locked')}<small>Unlock in the Brood branch</small></span></button>`;
     }
     return this.save.combs.map((_, i) => {
       const p = combProgress(this.save, i, m);
       return `<button class="comb ${p.ready ? 'ready' : ''}" data-comb="${i}" ${p.ready ? '' : 'disabled'} style="--p:${p.ratio}">
         <svg viewBox="-1 -1 2 2"><polygon class="cell" points="${hexPoints(0.92)}"/><polygon class="fill" points="${hexPoints(0.92)}"/></svg>
-        <span class="comb-text"><span class="egg">${p.ready ? '🐣' : '🥚'}</span><small data-comb-time="${i}">${p.ready ? 'Hatch!' : clock(p.msLeft / 1000)}</small></span>
+        <span class="comb-text"><span class="egg">${icon(p.ready ? 'twinEggs' : 'comb')}</span><small data-comb-time="${i}">${p.ready ? 'Hatch!' : clock(p.msLeft / 1000)}</small></span>
       </button>`;
     }).join('') + `<span class="muted small comb-note">one pack every ${clock(hatchMs(m) / 1000)}</span>`;
   }
@@ -240,7 +243,7 @@ export class Menu {
             <button data-tab="upgrades" class="${this.tab === 'upgrades' ? 'on' : ''}">Upgrades</button>
             <button data-tab="collection" class="${this.tab === 'collection' ? 'on' : ''}">Collection</button>
           </nav>
-          <span class="head-right">${this.tab === 'upgrades' ? '<button class="link" data-refund title="Free while costs are being tuned">Refund all</button>' : ''}<span class="mastery">✦ <b>${this.save.mastery}</b> Mastery</span></span>
+          <span class="head-right">${this.tab === 'upgrades' ? '<button class="link" data-refund title="Free while costs are being tuned">Refund all</button>' : ''}<span class="mastery">${icon('mastery')}<b>${this.save.mastery}</b> Mastery</span></span>
         </div>
         ${this.tab === 'upgrades' ? this.treeHtml() : this.collectionHtml()}
         <footer class="progress-foot">
@@ -278,7 +281,8 @@ export class Menu {
           <title>Quest: ${n.name}</title>
           <polygon class="halo" points="${hexPoints(R + 0.09)}"/>
           <polygon class="cell" points="${hexR}"/>
-          <text class="icon" y="0.02">${done ? '✅' : n.icon}</text>
+          <image class="cellimg" href="${UI.hex_quest}" x="${-R * 1.25}" y="${-R * 1.25}" width="${R * 2.5}" height="${R * 2.5}"/>
+          <image class="nicon" href="${ICONS_URL(done ? 'done' : 'quest')}" x="-0.22" y="-0.24" width="0.44" height="0.44"/>
           <g class="lvl" transform="translate(0 ${R + 0.14})">
             <rect x="${-w / 2}" y="-0.11" width="${w}" height="0.22" rx="0.11"/>
             <rect class="lvl-fill" x="${-w / 2}" y="-0.11" width="${(w * have / n.quest.goal).toFixed(3)}" height="0.22" rx="0.11"/>
@@ -296,8 +300,9 @@ export class Menu {
         <title>${hidden ? 'Unknown hero' : n.name}</title>
         <polygon class="halo" points="${hexPoints(R + 0.09)}"/>
         <polygon class="cell" points="${hexR}"/>
-        <text class="icon" y="0.02">${hidden ? '?' : n.icon}</text>
-        ${unlocked ? '' : `<text class="lock" x="0.27" y="-0.25">🔒</text>`}
+        <image class="cellimg" href="${UI[!unlocked ? 'hex_locked' : rank ? 'hex_owned' : 'hex_open']}" x="${-R * 1.25}" y="${-R * 1.25}" width="${R * 2.5}" height="${R * 2.5}"/>
+        ${hidden ? '<text class="icon" y="0.02">?</text>' : n.hero ? `<image class="nicon hero" href="${heroThumb(n.hero)}" x="-0.26" y="-0.26" width="0.52" height="0.52"/>` : `<image class="nicon" href="${ICONS_URL(nodeIcon(p.id))}" x="-0.22" y="-0.24" width="0.44" height="0.44"/>`}
+        ${unlocked ? '' : `<image class="lock" href="${ICONS_URL('locked')}" x="0.14" y="-0.42" width="0.24" height="0.24"/>`}
         <g class="lvl" transform="translate(0 ${R + 0.14})">
           <rect x="${-w / 2}" y="-0.11" width="${w}" height="0.22" rx="0.11"/>
           <rect class="lvl-fill" x="${-w / 2}" y="-0.11" width="${(w * frac).toFixed(3)}" height="0.22" rx="0.11"/>
@@ -311,7 +316,7 @@ export class Menu {
         <svg class="graph" viewBox="${bx} ${by} ${bw} ${bh}" preserveAspectRatio="xMidYMid meet">
           ${edges}${labels}
           <g class="seed" data-node="">
-            <circle r="0.62"/><circle class="seed-core" r="0.44"/><text class="icon" y="0.02">🌱</text>
+            <image href="${UI.hex_seed}" x="-0.66" y="-0.66" width="1.32" height="1.32"/><image class="nicon" href="${ICONS_URL('seed')}" x="-0.3" y="-0.32" width="0.6" height="0.6"/>
           </g>
           ${nodes}
         </svg>
@@ -328,7 +333,7 @@ export class Menu {
     if (n.quest) {
       const have = questProgress(this.save, id), done = questDone(this.save, id);
       return `<div class="detail" style="--c:${b.color}">
-        <div class="detail-top"><span class="detail-icon">${done ? '✅' : n.icon}</span>
+        <div class="detail-top"><span class="detail-icon">${icon(done ? 'done' : 'quest')}</span>
           <div class="detail-text"><b>${n.name}</b> <span class="muted small">${n.branch} · Quest · ${have}/${n.quest.goal}</span>
             <p><b>${n.quest.task}.</b> Reward: ${n.desc}.</p></div>
           <div class="detail-act">${done ? '<span class="maxed">Reward active</span>' : '<span class="needs">Costs no Mastery. Just play.</span>'}</div>
@@ -341,10 +346,10 @@ export class Menu {
     const hidden = !!n.hero && !unlocked;
     let action: string;
     if (rank >= max) action = `<span class="maxed">Maxed</span>`;
-    else if (!unlocked) action = `<span class="needs">🔒 ${n.hero ? 'Pull this hero from a pack to unlock' : `Needs ${TREE.nodes[n.parent!].name} first`}</span>`;
-    else action = `<button data-buy-node="${id}" ${this.save.mastery >= cost ? '' : 'disabled'}>Level up · ✦ ${cost}</button>`;
+    else if (!unlocked) action = `<span class="needs">${icon('locked')} ${n.hero ? 'Pull this hero from a pack to unlock' : `Needs ${TREE.nodes[n.parent!].name} first`}</span>`;
+    else action = `<button data-buy-node="${id}" ${this.save.mastery >= cost ? '' : 'disabled'}>Level up · ${icon('mastery')} ${cost}</button>`;
     return `<div class="detail" style="--c:${b.color}">
-      <div class="detail-top"><span class="detail-icon">${hidden ? '?' : n.icon}</span>
+      <div class="detail-top"><span class="detail-icon">${hidden ? '?' : n.hero ? `<img class="px-icon" src="${heroThumb(n.hero)}" alt="">` : icon(nodeIcon(id), n.icon)}</span>
         <div class="detail-text"><b>${hidden ? 'Unknown hero' : n.name}</b> <span class="muted small">${n.branch} · ${TIER_LABEL[n.tier ?? 'core']} · Level ${rank}/${max}</span>
           <p>${hidden ? 'Someone new is out there. Pull them to start levelling them up.' : n.desc}${n.hero && !hidden ? ' per level' : ''}</p></div>
         <div class="detail-act">${action}</div>
@@ -366,7 +371,7 @@ export class Menu {
       const dots = (['standard', 'foil', 'holo'] as Variant[]).map(v => `<span class="vdot ${v} ${vs.includes(v) ? 'have' : ''}" title="${VARIANT_LABEL[v]}${vs.includes(v) ? '' : ' (not yet)'}"></span>`).join('');
       if (!have) return `<div class="ccard unknown r-${d.rarity}"><span class="q">?</span><span class="small muted">${d.rarity}</span><div class="vdots">${dots}</div></div>`;
       return `<div class="ccard r-${d.rarity} ${best}" style="--tag:${hex(TAG_COLOR[d.tag])}">
-        <b>${d.name}</b><span class="small">${d.rarity}${d.tag === 'none' ? '' : ' · ' + d.tag}</span><div class="vdots">${dots}</div></div>`;
+        <img class="hero-art" src="${heroThumb(id)}" alt=""><b>${d.name}</b><span class="small">${d.rarity}${d.tag === 'none' ? '' : ' · ' + d.tag}</span><div class="vdots">${dots}</div></div>`;
     }).join('');
     const row = (name: string, type: string) => {
       const o = packOdds(type, m);
@@ -380,7 +385,7 @@ export class Menu {
         <div class="ccards">${SPELL_IDS.map(id => {
           const d = SPELLS[id];
           return this.save.spellsPulled.includes(id)
-            ? `<div class="ccard spell" style="--tag:${hex(TAG_COLOR[d.tag])}"><span class="spell-icon">${d.icon}</span><b>${d.name}</b><span class="small">${d.desc}</span></div>`
+            ? `<div class="ccard spell" style="--tag:${hex(TAG_COLOR[d.tag])}"><span class="spell-icon">${icon(id, d.icon)}</span><b>${d.name}</b><span class="small">${d.desc}</span></div>`
             : `<div class="ccard unknown spell"><span class="q">?</span><span class="small muted">spell</span></div>`;
         }).join('')}</div>
         <h3>Your pull odds</h3>
